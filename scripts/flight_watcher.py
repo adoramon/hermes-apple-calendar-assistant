@@ -1,0 +1,1 @@
+"""Flight monitoring entry point."""

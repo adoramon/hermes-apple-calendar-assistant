@@ -1,0 +1,1 @@
+"""Birthday notification entry point."""
