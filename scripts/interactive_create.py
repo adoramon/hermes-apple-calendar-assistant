@@ -1,25 +1,26 @@
-"""Platform-neutral draft and confirmation flow for creating calendar events."""
+"""Platform-neutral state manager for conversational event creation."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 try:
     from . import calendar_ops
-except ImportError:  # Allows running as: python3 scripts/interactive_create.py ...
+except ImportError:  # Allows running as: python3 scripts/interactive_create.py demo
     import calendar_ops  # type: ignore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PENDING_CONFIRMATIONS_PATH = PROJECT_ROOT / "data" / "pending_confirmations.json"
-REQUIRED_FIELDS = ("calendar_name", "title", "start_dt", "end_dt")
-OPTIONAL_FIELDS = ("location", "notes")
+
+ALLOWED_CALENDARS = ("商务计划", "家庭计划", "个人计划", "夫妻计划")
+REQUIRED_FIELDS = ("calendar", "title", "start", "end")
+DRAFT_FIELDS = ("calendar", "title", "start", "end", "location", "notes")
 
 
 def _result(ok: bool, data: Any = None, error: str | None = None) -> dict[str, Any]:
@@ -27,19 +28,43 @@ def _result(ok: bool, data: Any = None, error: str | None = None) -> dict[str, A
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _format_datetime_for_summary(value: Any) -> str:
+    if not isinstance(value, str):
+        return str(value)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    return parsed.strftime("%Y-%m-%d %H:%M")
+
+
+def _format_time_range_for_summary(start: Any, end: Any) -> str:
+    start_text = _format_datetime_for_summary(start)
+    end_text = _format_datetime_for_summary(end)
+    if isinstance(start_text, str) and isinstance(end_text, str):
+        start_day = start_text[:10]
+        if start_day and end_text.startswith(start_day):
+            return f"{start_text} - {end_text[11:]}"
+    return f"{start_text} - {end_text}"
 
 
 def _read_pending_store() -> dict[str, Any]:
     if not PENDING_CONFIRMATIONS_PATH.exists():
-        return {"confirmations": {}}
+        return {"sessions": {}}
     try:
         raw = json.loads(PENDING_CONFIRMATIONS_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"confirmations": {}}
-    if "confirmations" not in raw or not isinstance(raw["confirmations"], dict):
-        return {"confirmations": raw if isinstance(raw, dict) else {}}
-    return raw
+        return {"sessions": {}}
+    if not isinstance(raw, dict):
+        return {"sessions": {}}
+    if "sessions" in raw and isinstance(raw["sessions"], dict):
+        return raw
+    if "confirmations" in raw and isinstance(raw["confirmations"], dict):
+        return {"sessions": raw["confirmations"]}
+    return {"sessions": raw}
 
 
 def _write_pending_store(store: dict[str, Any]) -> None:
@@ -51,155 +76,223 @@ def _write_pending_store(store: dict[str, Any]) -> None:
 
 
 def build_draft_from_slots(payload: dict[str, Any]) -> dict[str, Any]:
-    """Build a normalized create-event draft from structured slot data."""
+    """Build a normalized draft from structured slot data."""
     slots = payload.get("slots", payload)
     if not isinstance(slots, dict):
         return _result(False, error="payload must be a dict or contain a dict 'slots' field.")
 
     draft = {
-        "action": "create_event",
-        "calendar_name": slots.get("calendar_name") or slots.get("calendar"),
+        "calendar": slots.get("calendar") or slots.get("calendar_name"),
         "title": slots.get("title"),
-        "start_dt": slots.get("start_dt") or slots.get("start"),
-        "end_dt": slots.get("end_dt") or slots.get("end"),
+        "start": slots.get("start") or slots.get("start_dt"),
+        "end": slots.get("end") or slots.get("end_dt"),
         "location": slots.get("location", ""),
         "notes": slots.get("notes", ""),
     }
-    missing_fields = get_missing_fields(draft)["data"]["missing_fields"]
-    return _result(True, data={"draft": draft, "missing_fields": missing_fields})
+    validation = get_missing_fields(draft)
+    return _result(True, data={"draft": draft, **validation["data"]})
 
 
 def get_missing_fields(draft: dict[str, Any]) -> dict[str, Any]:
-    """Return required fields that are absent or empty in the draft."""
+    """Return absent required fields and invalid draft values."""
     missing = [field for field in REQUIRED_FIELDS if not draft.get(field)]
-    return _result(True, data={"missing_fields": missing})
+    invalid = []
+    calendar = draft.get("calendar")
+    if calendar and calendar not in ALLOWED_CALENDARS:
+        invalid.append(
+            {
+                "field": "calendar",
+                "message": f"calendar must be one of: {', '.join(ALLOWED_CALENDARS)}",
+            }
+        )
+    return _result(True, data={"missing_fields": missing, "invalid_fields": invalid})
 
 
 def build_confirmation_summary(draft: dict[str, Any]) -> dict[str, Any]:
-    """Build a human-readable summary for the pending create action."""
-    missing = get_missing_fields(draft)["data"]["missing_fields"]
+    """Build a concise confirmation message for a pending create action."""
+    validation = get_missing_fields(draft)
+    missing = validation["data"]["missing_fields"]
+    invalid = validation["data"]["invalid_fields"]
     if missing:
         return _result(False, error=f"Missing required fields: {', '.join(missing)}")
+    if invalid:
+        return _result(False, error=invalid[0]["message"])
 
     lines = [
-        "请确认是否创建以下日历事件：",
-        f"- 日历：{draft['calendar_name']}",
-        f"- 标题：{draft['title']}",
-        f"- 开始：{draft['start_dt']}",
-        f"- 结束：{draft['end_dt']}",
+        "请确认是否创建日程：",
+        f"日历：{draft['calendar']}",
+        f"标题：{draft['title']}",
+        f"时间：{_format_time_range_for_summary(draft['start'], draft['end'])}",
     ]
     if draft.get("location"):
-        lines.append(f"- 地点：{draft['location']}")
+        lines.append(f"地点：{draft['location']}")
     if draft.get("notes"):
-        lines.append(f"- 备注：{draft['notes']}")
+        lines.append(f"说明：{draft['notes']}")
     return _result(True, data={"summary": "\n".join(lines)})
 
 
-def save_pending_confirmation(draft: dict[str, Any]) -> dict[str, Any]:
-    """Persist a create-event draft until the caller confirms or cancels it."""
+def save_pending_confirmation(session_key: str, draft: dict[str, Any]) -> dict[str, Any]:
+    """Save a draft by session key; Calendar.app is not written until confirm."""
     summary_result = build_confirmation_summary(draft)
     if not summary_result["ok"]:
         return summary_result
 
-    confirmation_id = uuid.uuid4().hex
-    pending_task = {
-        "id": confirmation_id,
+    normalized_draft = {field: draft.get(field, "") for field in DRAFT_FIELDS}
+    pending = {
+        "session_key": session_key,
         "action": "create_event",
         "status": "pending",
         "created_at": _now_iso(),
-        "draft": draft,
+        "draft": normalized_draft,
         "summary": summary_result["data"]["summary"],
     }
+    try:
+        store = _read_pending_store()
+        store.setdefault("sessions", {})[session_key] = pending
+        _write_pending_store(store)
+    except OSError as exc:
+        return _result(False, error=f"Failed to save pending confirmation: {exc}")
 
-    store = _read_pending_store()
-    store.setdefault("confirmations", {})[confirmation_id] = pending_task
-    _write_pending_store(store)
-
-    return _result(
-        True,
-        data={
-            "confirmation_id": confirmation_id,
-            "summary": pending_task["summary"],
-            "pending": pending_task,
-        },
-    )
+    return _result(True, data={"session_key": session_key, "pending": pending})
 
 
-def confirm_pending_action(confirmation_id: str) -> dict[str, Any]:
-    """Confirm a pending create action and write it to Calendar.app."""
-    store = _read_pending_store()
-    pending = store.get("confirmations", {}).get(confirmation_id)
+def load_pending_confirmation(session_key: str) -> dict[str, Any]:
+    """Load a pending confirmation without modifying Calendar.app."""
+    pending = _read_pending_store().get("sessions", {}).get(session_key)
     if not pending:
-        return _result(False, error=f"No pending confirmation found: {confirmation_id}")
+        return _result(False, error=f"No pending confirmation found for session: {session_key}")
+    return _result(True, data={"session_key": session_key, "pending": pending})
+
+
+def confirm_pending_action(session_key: str) -> dict[str, Any]:
+    """Confirm a pending create action and write it to Calendar.app."""
+    load_result = load_pending_confirmation(session_key)
+    if not load_result["ok"]:
+        return load_result
+
+    pending = load_result["data"]["pending"]
     if pending.get("status") != "pending":
-        return _result(False, error=f"Confirmation is not pending: {confirmation_id}")
+        return _result(False, error=f"Confirmation is not pending for session: {session_key}")
     if pending.get("action") != "create_event":
         return _result(False, error=f"Unsupported pending action: {pending.get('action')}")
 
     draft = pending.get("draft", {})
-    missing = get_missing_fields(draft)["data"]["missing_fields"]
-    if missing:
-        return _result(False, error=f"Pending draft is missing fields: {', '.join(missing)}")
+    summary_result = build_confirmation_summary(draft)
+    if not summary_result["ok"]:
+        return summary_result
 
     create_result = calendar_ops.create_event(
-        draft["calendar_name"],
+        draft["calendar"],
         draft["title"],
-        draft["start_dt"],
-        draft["end_dt"],
+        draft["start"],
+        draft["end"],
         location=draft.get("location", ""),
         notes=draft.get("notes", ""),
     )
     if not create_result["ok"]:
         return create_result
 
-    pending["status"] = "confirmed"
-    pending["confirmed_at"] = _now_iso()
-    pending["result"] = create_result["data"]
-    store["confirmations"][confirmation_id] = pending
-    _write_pending_store(store)
+    try:
+        store = _read_pending_store()
+        pending["status"] = "confirmed"
+        pending["confirmed_at"] = _now_iso()
+        pending["result"] = create_result["data"]
+        store.setdefault("sessions", {})[session_key] = pending
+        _write_pending_store(store)
+    except OSError as exc:
+        return _result(False, error=f"Calendar event created, but state update failed: {exc}")
+
+    return _result(True, data={"session_key": session_key, "calendar_result": create_result["data"]})
+
+
+def cancel_pending_action(session_key: str) -> dict[str, Any]:
+    """Cancel a pending action without touching Calendar.app."""
+    load_result = load_pending_confirmation(session_key)
+    if not load_result["ok"]:
+        return load_result
+
+    pending = load_result["data"]["pending"]
+    if pending.get("status") != "pending":
+        return _result(False, error=f"Confirmation is not pending for session: {session_key}")
+
+    try:
+        store = _read_pending_store()
+        pending["status"] = "cancelled"
+        pending["cancelled_at"] = _now_iso()
+        store.setdefault("sessions", {})[session_key] = pending
+        _write_pending_store(store)
+    except OSError as exc:
+        return _result(False, error=f"Failed to cancel pending confirmation: {exc}")
+
+    return _result(True, data={"session_key": session_key, "status": "cancelled"})
+
+
+def _run_demo() -> dict[str, Any]:
+    """Run a local demo without creating a Calendar.app event."""
+    session_key = "demo_session"
+    invalid_session_key = "demo_invalid_calendar"
+    payload = {
+        "calendar": "个人计划",
+        "title": "[测试] Interactive Create Demo",
+        "start": "2026-04-16T11:00:00",
+        "end": "2026-04-16T12:00:00",
+        "location": "测试地点",
+        "notes": "CLI demo only; confirm_pending_action() would create the event.",
+    }
+    draft_result = build_draft_from_slots(payload)
+    if not draft_result["ok"]:
+        return draft_result
+    save_result = save_pending_confirmation(session_key, draft_result["data"]["draft"])
+    if not save_result["ok"]:
+        return save_result
+    load_result = load_pending_confirmation(session_key)
+    if not load_result["ok"]:
+        return load_result
+    cancel_result = cancel_pending_action(session_key)
+    if not cancel_result["ok"]:
+        return cancel_result
+
+    invalid_payload = {
+        "calendar": "飞行计划",
+        "title": "[测试] Invalid Calendar Demo",
+        "start": "2026-04-16T13:00:00",
+        "end": "2026-04-16T14:00:00",
+        "location": "测试地点",
+        "notes": "This should not be saved as a confirmable pending action.",
+    }
+    invalid_draft_result = build_draft_from_slots(invalid_payload)
+    if not invalid_draft_result["ok"]:
+        return invalid_draft_result
+    invalid_save_result = save_pending_confirmation(
+        invalid_session_key,
+        invalid_draft_result["data"]["draft"],
+    )
+    invalid_load_result = load_pending_confirmation(invalid_session_key)
 
     return _result(
         True,
-        data={"confirmation_id": confirmation_id, "calendar_result": create_result["data"]},
+        data={
+            "valid_calendar_flow": {
+                "draft": draft_result["data"],
+                "saved": save_result["data"],
+                "loaded": load_result["data"],
+                "cancelled": cancel_result["data"],
+            },
+            "invalid_calendar_flow": {
+                "draft": invalid_draft_result["data"],
+                "save_attempt": invalid_save_result,
+                "load_attempt": invalid_load_result,
+                "expected": "invalid_fields contains calendar, save_attempt.ok is false, and load_attempt.ok is false.",
+            },
+            "note": "Demo does not call confirm_pending_action(), so it does not write to Calendar.app.",
+        },
     )
-
-
-def cancel_pending_action(confirmation_id: str) -> dict[str, Any]:
-    """Cancel a pending action without touching Calendar.app."""
-    store = _read_pending_store()
-    pending = store.get("confirmations", {}).get(confirmation_id)
-    if not pending:
-        return _result(False, error=f"No pending confirmation found: {confirmation_id}")
-    if pending.get("status") != "pending":
-        return _result(False, error=f"Confirmation is not pending: {confirmation_id}")
-
-    pending["status"] = "cancelled"
-    pending["cancelled_at"] = _now_iso()
-    store["confirmations"][confirmation_id] = pending
-    _write_pending_store(store)
-    return _result(True, data={"confirmation_id": confirmation_id, "status": "cancelled"})
-
-
-def _load_payload(value: str) -> dict[str, Any]:
-    path = Path(value)
-    if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
-    return json.loads(value)
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Create-event confirmation workflow demo.")
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    draft = subparsers.add_parser("draft", help="Create and save a pending draft.")
-    draft.add_argument("payload", help="JSON payload string or path to a JSON file.")
-
-    confirm = subparsers.add_parser("confirm", help="Confirm a pending draft.")
-    confirm.add_argument("confirmation_id")
-
-    cancel = subparsers.add_parser("cancel", help="Cancel a pending draft.")
-    cancel.add_argument("confirmation_id")
-
+    subparsers.add_parser("demo", help="Run a local draft/save/load/cancel demo.")
     return parser
 
 
@@ -207,23 +300,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "draft":
-        try:
-            payload = _load_payload(args.payload)
-        except (OSError, json.JSONDecodeError) as exc:
-            result = _result(False, error=f"Invalid payload: {exc}")
-        else:
-            draft_result = build_draft_from_slots(payload)
-            if not draft_result["ok"]:
-                result = draft_result
-            elif draft_result["data"]["missing_fields"]:
-                result = draft_result
-            else:
-                result = save_pending_confirmation(draft_result["data"]["draft"])
-    elif args.command == "confirm":
-        result = confirm_pending_action(args.confirmation_id)
-    elif args.command == "cancel":
-        result = cancel_pending_action(args.confirmation_id)
+    if args.command == "demo":
+        result = _run_demo()
     else:
         parser.error(f"Unknown command: {args.command}")
 
