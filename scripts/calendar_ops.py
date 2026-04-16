@@ -149,9 +149,10 @@ def list_events(
     prelude: list[str] = []
     prelude.append(_apple_date_assignment("startDate", start))
     prelude.append(_apple_date_assignment("endDate", end))
+    # Include any event that overlaps the requested window.
     event_query = (
-        "every event of targetCalendar whose start date is greater than or equal to "
-        "startDate and its start date is less than or equal to endDate"
+        "every event of targetCalendar whose end date is greater than startDate "
+        "and its start date is less than endDate"
     )
 
     script = f"""
@@ -363,8 +364,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     events = subparsers.add_parser("events", help="List events in a calendar.")
     events.add_argument("calendar_name")
-    events.add_argument("--start")
-    events.add_argument("--end")
+    events.add_argument("--start", help="ISO datetime, e.g. 2026-04-16T00:00:00")
+    events.add_argument("--end", help="ISO datetime, e.g. 2026-04-17T00:00:00")
 
     create = subparsers.add_parser("create", help="Create an event.")
     create.add_argument("calendar_name")

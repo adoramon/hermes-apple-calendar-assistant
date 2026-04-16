@@ -1,1 +1,21 @@
-{}
+{
+  "profile": "sunny-wechat-lite",
+  "timezone": "Asia/Shanghai",
+  "read_calendars": [
+    "商务计划",
+    "家庭计划",
+    "个人计划",
+    "夫妻计划",
+    "飞行计划"
+  ],
+  "write_calendars": [
+    "商务计划",
+    "家庭计划",
+    "个人计划",
+    "夫妻计划"
+  ],
+  "flight_calendar": "飞行计划",
+  "flight_scan_days": 30,
+  "default_query_days": 7,
+  "confirmation_required": true
+}

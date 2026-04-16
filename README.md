@@ -1,118 +1,145 @@
 # hermes-apple-calendar-assistant
 
-Hermes custom skill for macOS Apple Calendar integration. It is designed for the
-`sunny-wechat-lite` Hermes profile and uses Python plus `osascript`/AppleScript
-to operate Calendar.app.
+Apple Calendar Assistant 1.0 is a macOS-only Hermes custom skill for operating
+Calendar.app from the `sunny-wechat-lite` profile.
 
-## Project Overview
+## Scope
 
-This project provides a local skill layer for conversational calendar workflows:
-Hermes handles the user conversation, while the scripts in this repository handle
-Calendar.app access, confirmation state, and workflow-specific logic.
+1.0 includes:
 
-The project is macOS-only. Python 3.11+ is expected, and the implementation should
-prefer the Python standard library unless a dependency is clearly necessary.
+- Query Apple Calendar events after a clear time range is known.
+- Create events with structured slots and explicit confirmation.
+- Update existing events after confirmation.
+- Delete events after second confirmation.
+- Scan future `飞行计划` events and write departure airport/terminal into the
+  original event `location` field.
 
-## Feature Scope
+1.0 excludes:
 
-- Conversational calendar CRUD for Apple Calendar.
-- Explicit confirmation before create, update, or delete operations.
-- Pending confirmation storage using JSON files.
-- Flight event detection and enhancement proposals.
-- Birthday reminder generation for the 07:00 workflow.
-- Clear local logs and no hardcoded personal secrets.
+- Birthday reminders
+- Contacts, lunar birthday, or anniversary workflows
+- Travel Time automation
+- Reminder/alarm enhancement
+- Native Swift helpers
+- Extra preparation events for flights
+
+## Calendar Policy
+
+Read calendars:
+
+- 商务计划
+- 家庭计划
+- 个人计划
+- 夫妻计划
+- 飞行计划
+
+Normal write calendars:
+
+- 商务计划
+- 家庭计划
+- 个人计划
+- 夫妻计划
+
+`飞行计划` is not writable through normal create/update/delete. The only flight
+write in 1.0 is the dedicated location enhancement on the original flight event.
 
 ## Directory Structure
 
 ```text
 hermes-apple-calendar-assistant/
-├── AGENTS.md                         # Project goals, runtime constraints, and safety rules
-├── README.md                         # Project documentation
-├── .gitignore                        # Local ignore rules
+├── AGENTS.md
+├── README.md
+├── SKILL.md
+├── .gitignore
 ├── .codex/
-│   └── config.toml                   # Codex project configuration
-├── SKILL.md                          # Hermes skill instructions
+│   └── config.toml
 ├── config/
-│   └── settings.json                 # Runtime configuration
+│   └── settings.json
 ├── data/
-│   ├── state.json                    # General workflow state
-│   ├── pending_confirmations.json    # Pending create/update/delete confirmations
-│   └── birthday_history.json         # Birthday reminder de-duplication history
+│   ├── state.json
+│   ├── pending_confirmations.json
+│   ├── flight_seen.json
+│   └── flight_pending.json
 └── scripts/
-    ├── calendar_ops.py               # Core Calendar.app CRUD operations
-    ├── interactive_create.py         # Slot filling and confirmation workflow
-    ├── flight_watcher.py             # Flight event detection and enhancement workflow
-    ├── birthday_notifier.py          # Birthday reminder generation
-    └── util.py                       # Shared helpers
+    ├── calendar_ops.py
+    ├── interactive_create.py
+    ├── flight_parser.py
+    ├── flight_watcher.py
+    ├── flight_enhancer.py
+    └── util.py
 ```
 
-## Local Run
+## Local Usage
 
-Run commands from the project root:
+List calendars:
 
 ```bash
-cd /path/to/hermes-apple-calendar-assistant
-python3 --version
+python3 scripts/calendar_ops.py calendars
 ```
 
-Use Python 3.11 or newer. During development, individual scripts can be run
-directly once their entry points are implemented:
+Query a calendar:
 
 ```bash
-python3 scripts/calendar_ops.py
-python3 scripts/interactive_create.py
-python3 scripts/flight_watcher.py
-python3 scripts/birthday_notifier.py
+python3 scripts/calendar_ops.py events "个人计划" --start "2026-04-16T00:00:00" --end "2026-04-17T00:00:00"
 ```
 
-Calendar access depends on macOS permissions. The first `osascript`/Calendar.app
-operation may trigger a system permission prompt.
+Create a pending event draft:
 
-## Deploy To sunny-wechat-lite
+```bash
+python3 scripts/interactive_create.py create-draft \
+  --session-key "wechat_user_001" \
+  --calendar "个人计划" \
+  --title "和客户开会" \
+  --start "2026-04-18T15:00:00" \
+  --end "2026-04-18T16:00:00" \
+  --location "国贸" \
+  --notes "讨论商务合作"
+```
 
-1. Keep this repository available on the same macOS host that runs Hermes.
-2. Copy or symlink `SKILL.md` into the custom skills location used by the
-   `sunny-wechat-lite` Hermes profile.
-3. Ensure the skill instructions reference the scripts in this repository using
-   stable absolute paths.
-4. Confirm the Hermes runtime can execute `python3` and `osascript`.
-5. Restart or reload the `sunny-wechat-lite` profile so Hermes picks up the
-   updated skill instructions.
+Confirm or cancel:
 
-Do not store secrets in `SKILL.md`, `config/settings.json`, or the data files.
+```bash
+python3 scripts/interactive_create.py confirm --session-key "wechat_user_001"
+python3 scripts/interactive_create.py cancel --session-key "wechat_user_001"
+```
+
+Scan flight events:
+
+```bash
+python3 scripts/flight_watcher.py scan --days 30
+python3 scripts/flight_enhancer.py list-pending
+python3 scripts/flight_enhancer.py confirm "<task_id>"
+```
+
+## Deployment
+
+Deploy `SKILL.md` into the Hermes custom skill location used by
+`sunny-wechat-lite`. The skill file uses absolute script paths so Hermes does not
+need to run from the repository root.
+
+Calendar access depends on macOS automation permissions for `osascript` and
+Calendar.app.
 
 ## Verification
 
-Use the following checklist after each implementation milestone:
+```bash
+python3 -m py_compile scripts/calendar_ops.py scripts/interactive_create.py scripts/flight_parser.py scripts/flight_watcher.py scripts/flight_enhancer.py scripts/util.py
+python3 -m json.tool data/state.json
+python3 -m json.tool data/pending_confirmations.json
+python3 -m json.tool data/flight_seen.json
+python3 -m json.tool data/flight_pending.json
+```
+## Current Status
 
-1. Confirm the repository files exist:
+Stable in 1.0:
 
-   ```bash
-   find . -path ./.git -prune -o -type f -print | sort
-   ```
+- Calendar CRUD
+- Confirmation workflow
+- WeChat skill integration
+- Flight location enhancement
 
-2. Confirm JSON state files are valid:
+Not in 1.0:
 
-   ```bash
-   python3 -m json.tool config/settings.json
-   python3 -m json.tool data/state.json
-   python3 -m json.tool data/pending_confirmations.json
-   python3 -m json.tool data/birthday_history.json
-   ```
-
-3. Confirm Calendar.app can be reached from the shell:
-
-   ```bash
-   osascript -e 'tell application "Calendar" to get name of calendars'
-   ```
-
-4. Test the Hermes conversation flow in `sunny-wechat-lite`:
-
-   - Ask for a calendar event to be created.
-   - Confirm Hermes asks for explicit approval before writing.
-   - Approve the pending operation.
-   - Confirm the event appears in Calendar.app.
-   - Test canceling a pending operation.
-
-5. For flight and birthday workflows, confirm proposals are generated first and
-   no calendar event is modified without confirmation.
+- Contacts reminders
+- Birthday workflows
+- Travel Time

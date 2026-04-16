@@ -289,9 +289,64 @@ def _run_demo() -> dict[str, Any]:
     )
 
 
+def _create_draft_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    payload = {
+        "calendar": args.calendar,
+        "title": args.title,
+        "start": args.start,
+        "end": args.end,
+        "location": args.location,
+        "notes": args.notes,
+    }
+    draft_result = build_draft_from_slots(payload)
+    if not draft_result["ok"]:
+        return draft_result
+
+    draft_data = draft_result["data"]
+    if draft_data["missing_fields"] or draft_data["invalid_fields"]:
+        return _result(False, data=draft_data, error="Draft is incomplete or invalid.")
+
+    save_result = save_pending_confirmation(args.session_key, draft_data["draft"])
+    if not save_result["ok"]:
+        return save_result
+
+    return _result(
+        True,
+        data={
+            "draft": draft_data["draft"],
+            "missing_fields": draft_data["missing_fields"],
+            "invalid_fields": draft_data["invalid_fields"],
+            "pending": save_result["data"]["pending"],
+            "summary": save_result["data"]["pending"]["summary"],
+        },
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Create-event confirmation workflow demo.")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    create_draft = subparsers.add_parser(
+        "create-draft",
+        help="Build, validate, and save a pending create-event draft.",
+    )
+    create_draft.add_argument("--session-key", required=True, help="Stable caller/session id.")
+    create_draft.add_argument("--calendar", required=True, help="Target calendar name.")
+    create_draft.add_argument("--title", required=True, help="Event title.")
+    create_draft.add_argument("--start", required=True, help="ISO datetime, e.g. 2026-04-18T15:00:00.")
+    create_draft.add_argument("--end", required=True, help="ISO datetime, e.g. 2026-04-18T16:00:00.")
+    create_draft.add_argument("--location", default="", help="Optional event location.")
+    create_draft.add_argument("--notes", default="", help="Optional event notes.")
+
+    show_pending = subparsers.add_parser("show-pending", help="Show pending confirmation for a session.")
+    show_pending.add_argument("--session-key", required=True, help="Stable caller/session id.")
+
+    confirm = subparsers.add_parser("confirm", help="Confirm a pending create-event action.")
+    confirm.add_argument("--session-key", required=True, help="Stable caller/session id.")
+
+    cancel = subparsers.add_parser("cancel", help="Cancel a pending create-event action.")
+    cancel.add_argument("--session-key", required=True, help="Stable caller/session id.")
+
     subparsers.add_parser("demo", help="Run a local draft/save/load/cancel demo.")
     return parser
 
@@ -300,7 +355,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "demo":
+    if args.command == "create-draft":
+        result = _create_draft_from_args(args)
+    elif args.command == "show-pending":
+        result = load_pending_confirmation(args.session_key)
+    elif args.command == "confirm":
+        result = confirm_pending_action(args.session_key)
+    elif args.command == "cancel":
+        result = cancel_pending_action(args.session_key)
+    elif args.command == "demo":
         result = _run_demo()
     else:
         parser.error(f"Unknown command: {args.command}")
