@@ -22,6 +22,8 @@ APPLE_DATETIME_RE = re.compile(
     r"(?P<hour>\d{1,2}):(?P<minute>\d{2}):(?P<second>\d{2})"
 )
 MAX_SUGGESTED_SLOTS = 3
+WORKDAY_START = time(9, 0, 0)
+WORKDAY_END = time(21, 0, 0)
 
 
 def _parse_iso_datetime(value: str, field_name: str) -> datetime:
@@ -106,15 +108,20 @@ def _suggest_slots(
     requested_end: datetime,
     day_events: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
-    """Suggest up to three same-day free slots after the requested start."""
+    """Suggest up to three same-day free slots inside 09:00-21:00."""
     duration = requested_end - requested_start
-    day_end = datetime.combine(requested_start.date(), time(23, 59, 59))
-    cursor = requested_start
+    window_start = datetime.combine(requested_start.date(), WORKDAY_START)
+    window_end = datetime.combine(requested_start.date(), WORKDAY_END)
+    cursor = max(requested_start, window_start)
     suggestions = []
 
     for busy_start, busy_end in _busy_ranges(day_events):
+        if busy_start >= window_end:
+            break
         if busy_end <= cursor:
             continue
+        busy_start = max(busy_start, window_start)
+        busy_end = min(busy_end, window_end)
         if busy_start > cursor:
             while cursor + duration <= busy_start and len(suggestions) < MAX_SUGGESTED_SLOTS:
                 slot_end = cursor + duration
@@ -130,7 +137,7 @@ def _suggest_slots(
         if busy_end > cursor:
             cursor = busy_end
 
-    while cursor + duration <= day_end and len(suggestions) < MAX_SUGGESTED_SLOTS:
+    while cursor + duration <= window_end and len(suggestions) < MAX_SUGGESTED_SLOTS:
         slot_end = cursor + duration
         suggestions.append(
             {
@@ -166,14 +173,18 @@ def check_conflicts(calendar_name: str, start_text: str, end_text: str) -> dict[
     ]
     suggested_slots: list[dict[str, str]] = []
     if conflicts:
-        day_end = datetime.combine(start.date(), time(23, 59, 59))
-        day_result = calendar_ops.list_events(calendar_name, start_date=start, end_date=day_end)
+        day_start = datetime.combine(start.date(), WORKDAY_START)
+        day_end = datetime.combine(start.date(), WORKDAY_END)
+        day_result = calendar_ops.list_events(calendar_name, start_date=day_start, end_date=day_end)
         if not day_result["ok"]:
             return day_result
         suggested_slots = _suggest_slots(start, end, day_result["data"]["events"])
 
     return util.json_ok(
         {
+            "calendar": calendar_name,
+            "start": start_text,
+            "end": end_text,
             "has_conflict": bool(conflicts),
             "conflicts": conflicts,
             "suggested_slots": suggested_slots,
