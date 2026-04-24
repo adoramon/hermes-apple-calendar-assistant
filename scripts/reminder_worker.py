@@ -12,9 +12,10 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import calendar_ops, settings, util
+    from . import calendar_ops, message_adapter, settings, util
 except ImportError:  # Allows running as: python3 scripts/reminder_worker.py ...
     import calendar_ops  # type: ignore
+    import message_adapter  # type: ignore
     import settings  # type: ignore
     import util  # type: ignore
 
@@ -191,11 +192,41 @@ def scan_reminders() -> dict[str, Any]:
     )
 
 
+def _format_outbound_result(raw_result: dict[str, Any], channel: str, recipient: str) -> dict[str, Any]:
+    """Convert raw reminder candidates into outbound message payloads."""
+    if not raw_result["ok"]:
+        return raw_result
+    messages = []
+    for reminder in raw_result["data"]["reminders"]:
+        metadata = {
+            "type": "calendar_reminder",
+            "calendar": reminder.get("calendar", ""),
+            "title": reminder.get("title", ""),
+            "start": reminder.get("start", ""),
+            "end": reminder.get("end", ""),
+            "location": reminder.get("location", ""),
+            "offset_minutes": reminder.get("offset_minutes"),
+            "fingerprint": reminder.get("fingerprint", ""),
+        }
+        messages.append(
+            message_adapter.build_outbound_payload(
+                channel,
+                recipient,
+                message_adapter.build_calendar_reminder_message(reminder),
+                metadata=metadata,
+            )
+        )
+    return util.json_ok({"messages": messages, "skipped": raw_result["data"]["skipped"]})
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(description="Scan reminder candidates without sending notifications.")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("scan", help="Scan readable calendars for due reminder candidates.")
+    scan = subparsers.add_parser("scan", help="Scan readable calendars for due reminder candidates.")
+    scan.add_argument("--format", choices=("raw", "outbound"), default="raw")
+    scan.add_argument("--channel", default="hermes")
+    scan.add_argument("--recipient", default="default")
     return parser
 
 
@@ -204,6 +235,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "scan":
         result = scan_reminders()
+        if args.format == "outbound":
+            result = _format_outbound_result(result, args.channel, args.recipient)
     else:
         raise AssertionError(args.command)
     print(json.dumps(result, ensure_ascii=False, indent=2))
