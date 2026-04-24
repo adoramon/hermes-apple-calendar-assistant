@@ -94,16 +94,18 @@ you cannot access the calendar unless the script actually fails.
 
 ## Create Rules
 
-For create requests, first parse natural language when useful:
+用户要求创建日程时，必须按以下顺序处理：
+
+1. 先调用自然语言解析器：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/nlp_event_parser.py parse "<user_text>"
 ```
 
-The parser only returns a draft. It does not save pending state and does not
-write Calendar.app. It must never produce `飞行计划` as a normal create target.
+解析器只返回草稿，不保存 pending state，不写 Calendar.app。解析结果不得把
+`飞行计划` 作为普通创建目标。
 
-For create requests, infer or ask for:
+2. 如果字段缺失，询问用户补齐：
 
 - `calendar`
 - `title`
@@ -112,15 +114,14 @@ For create requests, infer or ask for:
 - `location`
 - `notes`
 
-Suggest the calendar from context:
+根据上下文建议日历：
 
 - personal/private tasks: `个人计划`
 - family tasks: `家庭计划`
 - work/business tasks: `商务计划`
 - couple/shared partner tasks: `夫妻计划`
 
-If required fields are missing, ask follow-up questions. Once complete, create a
-pending draft with conflict checking enabled by default:
+3. 字段完整后，创建 pending draft，并默认加 `--check-conflict`：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py create-draft \
@@ -134,9 +135,10 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/intera
   --check-conflict
 ```
 
-Show the returned `summary`, draft fields, and any `conflict_check` result. If
-`has_conflict` is true, summarize `conflicts` and `suggested_slots`; do not
-change the time automatically. Only after the user explicitly confirms, run:
+4. 必须向用户展示草稿、冲突情况和建议时间。若 `has_conflict` 为 true，说明
+`conflicts` 和 `suggested_slots`；不要自动改时间。
+
+5. 只有用户明确确认后，才执行：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py confirm --session-key "<session_key>"
@@ -148,19 +150,18 @@ If the user cancels:
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py cancel --session-key "<session_key>"
 ```
 
-Creating the event always requires explicit confirmation. The confirm command
-uses the original pending draft time unless the user asks to change the draft and
-confirms the revised version.
+创建日程永远需要显式确认。`confirm` 使用 pending draft 中的原始时间，除非用户
+要求修改草稿并确认修改后的版本。
 
 ## Update Rules
 
-For update requests, identify:
+用户要求修改日程时，先识别：
 
 - calendar
 - existing event title
 - fields to change
 
-Show a confirmation summary before writing. After confirmation, call:
+写入前必须二次确认。确认后再调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/calendar_ops.py update "<calendar>" "<old_title>" --new-title "<new_title>" --start "<start>" --end "<end>" --location "<location>" --notes "<notes>"
@@ -170,7 +171,7 @@ Only include flags for fields that should change.
 
 ## Delete Rules
 
-Deletion requires second confirmation. After confirmation, call:
+用户要求删除日程时，必须二次确认。确认后再调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/calendar_ops.py delete "<calendar>" "<title>" --yes
@@ -180,25 +181,27 @@ Make clear that v2.0-alpha still deletes the first exact-title match in the targ
 
 ## Upcoming Reminder Scan
 
-For reminder-like requests, scan upcoming events and return JSON-derived
-candidates only:
+提醒扫描规则：
+
+- 当前 `reminder_worker.py` 只生成提醒候选 JSON
+- 当前阶段不主动发送微信或 Telegram
+- 是否启用 reminder worker launchd 由用户手动决定
+
+用户询问即将提醒事项时，可调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/reminder_worker.py scan
 ```
 
-Do not send WeChat, Telegram, Calendar alarms, or system notifications in
-v2.0-alpha. The reminder worker also has a launchd template for background
-scanning, but Hermes conversations should only summarize returned candidates in
-WeChat-friendly text.
+Hermes 对话中只总结返回的候选提醒，不安装 launchd，不持续后台监控。
 
 ## Flight Location Enhancement
 
 Flight location enhancement has two modes:
 
-- Background automatic enhancement is handled by the user-level launchd task.
-- Hermes conversations may run one-off scans or inspect pending/manual tasks, but
-  Hermes is not responsible for continuous monitoring.
+- `飞行计划` location 自动增强由用户级 launchd 后台任务负责。
+- Hermes 对话不负责持续监控。
+- 普通 CRUD 不得写 `飞行计划`。
 
 The launchd task calls:
 

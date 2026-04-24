@@ -1,17 +1,19 @@
 # Apple Calendar Assistant
 
+Current version: `v2.0-alpha`
+
 ## v2.0.0-alpha
 
-Development scope:
+变更记录：
 
-- Natural-language create draft parsing
-- Event conflict detection
-- Upcoming reminder candidate scanning with JSON output only
-- Existing confirmation requirements and flight safety boundaries preserved
-- `interactive_create.py create-draft --check-conflict`
-- `reminder_worker.py scan` with `data/reminder_seen.json` idempotency
-- launchd template for the reminder worker
-- Hermes skill instructions for parse -> draft -> conflict check -> confirm
+- shared settings/util helpers
+- natural language event parser
+- conflict checker
+- conflict-aware draft creation
+- reminder scan worker
+- reminder launchd template
+- 保留所有写操作确认要求
+- 保留 `飞行计划` 普通 CRUD 禁写边界
 
 ## v1.0.0
 

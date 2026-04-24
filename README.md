@@ -1,24 +1,21 @@
 # hermes-apple-calendar-assistant
 
-Apple Calendar Assistant is a macOS-only Hermes custom skill for operating
-Calendar.app from the `sunny-wechat-lite` profile. The current development line
-is `v2.0-alpha`.
+Apple Calendar Assistant 是一个 macOS-only Hermes custom skill，用于在
+`sunny-wechat-lite` profile 中操作 Calendar.app。当前开发线是
+`v2.0-alpha`。
 
-## Scope
+## v2.0-alpha 功能列表
 
-v2.0-alpha includes:
+v2.0-alpha 已支持：
 
-- Query Apple Calendar events after a clear time range is known.
-- Create events with structured slots and explicit confirmation.
-- Update existing events after confirmation.
-- Delete events after second confirmation.
-- Scan future `飞行计划` events and write departure airport/terminal into the
-  original event `location` field.
-- Run a launchd background task every 5 minutes to automatically enhance new
-  future `飞行计划` events.
-- Parse simple natural-language create requests into draft JSON.
-- Detect conflicts for proposed event windows.
-- Scan upcoming events as reminder candidates with JSON output only.
+- 明确时间范围后查询 Apple Calendar 日程
+- 确认式创建、修改、删除日程
+- 自然语言日程草稿解析
+- 创建草稿时可选冲突检测：`--check-conflict`
+- 单日历冲突检测与建议时间段
+- 提醒候选扫描：只输出 JSON，不主动发送消息
+- reminder worker launchd 模板
+- `飞行计划` location 自动增强 launchd 后台任务
 
 v2.0-alpha excludes:
 
@@ -182,6 +179,13 @@ python3 scripts/flight_auto_enhancer.py run
 
 See [docs/flight-auto-enhancer.md](docs/flight-auto-enhancer.md) for install,
 uninstall, log, and `flight_seen.json` reset instructions.
+
+Flight auto enhancer 与 reminder worker 的区别：
+
+- `flight_auto_enhancer.py` 只服务 `飞行计划`，会在允许边界内写回原事件
+  `location` 字段，用于补充出发机场/航站楼。
+- `reminder_worker.py` 只读所有 `read_calendars`，生成提醒候选 JSON，并用
+  `data/reminder_seen.json` 做幂等；当前阶段不发送微信、Telegram 或系统通知。
 
 Reminder scanning can also run as a launchd task:
 

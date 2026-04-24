@@ -1,21 +1,23 @@
 # v2 Roadmap
 
-This document tracks the v2.0-alpha direction without expanding the current
-project boundary beyond Apple Calendar workflows.
+本文档记录 v2.0-alpha 已完成内容和后续 v2.0-beta 建议方向。项目边界仍保持在
+Apple Calendar 工作流内。
 
-## v2.0-alpha
+## 已完成 v2.0-alpha 阶段
 
-Implemented or in progress:
+已完成：
 
-- Natural-language event draft parsing with `scripts/nlp_event_parser.py`
-- Confirmation-first create flow through `scripts/interactive_create.py`
-- Default conflict checking for create drafts with `--check-conflict`
-- Single-calendar conflict checking with `scripts/conflict_checker.py`
-- Reminder candidate scanning with `scripts/reminder_worker.py scan`
-- Reminder idempotency through `data/reminder_seen.json`
-- launchd templates for flight location enhancement and reminder scanning
+- shared settings/util helpers
+- 自然语言日程草稿解析：`scripts/nlp_event_parser.py`
+- 确认优先的创建流程：`scripts/interactive_create.py`
+- 创建草稿默认可接入冲突检测：`--check-conflict`
+- 单日历冲突检测：`scripts/conflict_checker.py`
+- 提醒候选扫描：`scripts/reminder_worker.py scan`
+- 提醒幂等标识：`data/reminder_seen.json`
+- reminder worker launchd 模板
+- 飞行计划 location 自动增强 launchd 模板
 
-Safety boundaries:
+安全边界：
 
 - All normal writes still require confirmation
 - `飞行计划` is not writable through normal create, update, or delete
@@ -24,17 +26,17 @@ Safety boundaries:
   notifications, or Calendar alarms
 - Hermes conversations do not perform continuous monitoring
 
-## Later v2 Work
+## v2.0-beta 建议方向
 
-Potential follow-up work:
+建议方向：
 
-- Broaden natural-language parsing coverage while keeping deterministic rules
-- Add multi-calendar conflict checks
-- Add reminder delivery adapters behind explicit opt-in configuration
-- Add richer tests around date parsing, suggested slots, and reminder idempotency
-- Improve update/delete candidate selection before confirmation
+- Hermes 主动提醒发送
+- 更精准的中文时间解析
+- 候选事件选择式修改/删除
+- 多日历联合冲突检测
+- 周报/月报总结
 
-Still out of scope:
+仍然不在当前阶段范围：
 
 - Contacts integration
 - Birthday and lunar birthday workflows
