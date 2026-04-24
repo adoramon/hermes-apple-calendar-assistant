@@ -84,6 +84,14 @@ tail -f /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_
 tail -f /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.err.log
 ```
 
+## 手动触发一次
+
+安装 launchd 后，可以立即触发一次，不需要等待下一分钟：
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.adoramon.hermes-apple-calendar-reminder-worker"
+```
+
 ## 查看 `reminder_seen.json`
 
 View idempotency records:
