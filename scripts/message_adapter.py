@@ -59,5 +59,5 @@ def build_outbound_payload(
         "channel": channel,
         "recipient": recipient,
         "message": message,
-        "metadata": metadata or {},
+        "metadata": dict(metadata or {}),
     }

@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import calendar_ops, message_adapter, settings, util
+    from . import calendar_ops, message_adapter, outbox, settings, util
 except ImportError:  # Allows running as: python3 scripts/reminder_worker.py ...
     import calendar_ops  # type: ignore
     import message_adapter  # type: ignore
+    import outbox  # type: ignore
     import settings  # type: ignore
     import util  # type: ignore
 
@@ -219,6 +220,25 @@ def _format_outbound_result(raw_result: dict[str, Any], channel: str, recipient:
     return util.json_ok({"messages": messages, "skipped": raw_result["data"]["skipped"]})
 
 
+def _write_outbox_result(outbound_result: dict[str, Any]) -> dict[str, Any]:
+    """Write outbound messages to the dry-run outbox queue."""
+    if not outbound_result["ok"]:
+        return outbound_result
+    messages = outbound_result["data"]["messages"]
+    append_result = outbox.append_outbox_messages(messages)
+    skipped = list(outbound_result["data"].get("skipped", []))
+    skipped.extend(append_result["skipped"])
+    data = {
+        "messages": messages,
+        "skipped": skipped,
+        "outbox": {
+            "written_count": len(append_result["written"]),
+            "message_ids": [record["id"] for record in append_result["written"]],
+        },
+    }
+    return util.json_ok(data)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(description="Scan reminder candidates without sending notifications.")
@@ -227,6 +247,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--format", choices=("raw", "outbound"), default="raw")
     scan.add_argument("--channel", default="hermes")
     scan.add_argument("--recipient", default="default")
+    scan.add_argument("--write-outbox", action="store_true")
     return parser
 
 
@@ -235,8 +256,10 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "scan":
         result = scan_reminders()
-        if args.format == "outbound":
+        if args.format == "outbound" or args.write_outbox:
             result = _format_outbound_result(result, args.channel, args.recipient)
+        if args.write_outbox:
+            result = _write_outbox_result(result)
     else:
         raise AssertionError(args.command)
     print(json.dumps(result, ensure_ascii=False, indent=2))
