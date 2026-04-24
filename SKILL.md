@@ -1,24 +1,27 @@
 ---
 name: apple-calendar-assistant
-description: Apple Calendar 1.0 日程查询、创建、修改、删除与飞行计划位置增强，适用于 macOS。
+description: Apple Calendar v2.0-alpha 日程查询、确认式写入、冲突检测、提醒候选扫描与飞行计划位置增强，适用于 macOS。
 platforms: [macos]
 ---
 
-# Apple Calendar Assistant 1.0
+# Apple Calendar Assistant v2.0-alpha
 
 ## Scope
 
-Use this skill only for Apple Calendar Assistant 1.0:
+Use this skill only for Apple Calendar Assistant v2.0-alpha:
 
 - 查询日历行程
 - 创建日历行程
 - 修改日历行程
 - 删除日历行程
+- 自然语言日程草稿解析
+- 日程冲突检测
+- 即将到来日程提醒候选扫描
 - 飞行计划位置增强
 
 Do not handle birthday reminders, Contacts, lunar birthdays, anniversaries,
-Travel Time, reminder/alarm enhancement, native Swift helpers, or extra flight
-preparation events in this skill.
+Travel Time, reminder/alarm enhancement, notification delivery, native Swift
+helpers, or extra flight preparation events in this skill.
 
 ## When To Use
 
@@ -33,6 +36,9 @@ Use this skill when the user says things like:
 - 查询行程
 - 新建日程
 - 添加安排
+- 明天下午三点在国贸和客户开会
+- 这个时间有没有冲突
+- 接下来一小时有什么需要提醒
 - 修改日程
 - 删除日程
 - 扫描飞行计划
@@ -55,9 +61,9 @@ Normal write calendars:
 - 个人计划
 - 夫妻计划
 
-`飞行计划` must not be used for normal create/update/delete. In 1.0 it may only
-be updated by the dedicated flight location enhancement, and only the original
-event `location` field may be changed.
+`飞行计划` must not be used for normal create/update/delete. It may only be
+updated by the dedicated flight location enhancement, and only the original event
+`location` field may be changed.
 
 ## Query Rules
 
@@ -87,6 +93,15 @@ Return a concise WeChat-friendly summary grouped or ordered by time. Do not say
 you cannot access the calendar unless the script actually fails.
 
 ## Create Rules
+
+For create requests, first parse natural language when useful:
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/nl_draft_parser.py parse "<user_text>"
+```
+
+The parser only returns a draft. It does not save pending state and does not
+write Calendar.app.
 
 For create requests, infer or ask for:
 
@@ -130,6 +145,16 @@ If the user cancels:
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py cancel --session-key "<session_key>"
 ```
 
+Before saving or confirming a create draft, check conflicts when start/end are
+known:
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/conflict_detector.py check --calendar "<calendar>" --start "<start>" --end "<end>"
+```
+
+If conflicts exist, summarize them and ask whether the user still wants to
+continue. Creating the event still requires explicit confirmation.
+
 ## Update Rules
 
 For update requests, identify:
@@ -154,7 +179,19 @@ Deletion requires second confirmation. After confirmation, call:
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/calendar_ops.py delete "<calendar>" "<title>" --yes
 ```
 
-Make clear that 1.0 deletes the first exact-title match in the target calendar.
+Make clear that v2.0-alpha still deletes the first exact-title match in the target calendar.
+
+## Upcoming Reminder Scan
+
+For reminder-like requests, scan upcoming events and return JSON-derived
+candidates only:
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/upcoming_reminders.py scan --minutes 60
+```
+
+Do not send WeChat, Telegram, Calendar alarms, or system notifications in
+v2.0-alpha. Summarize the returned candidates in WeChat-friendly text.
 
 ## Flight Location Enhancement
 
