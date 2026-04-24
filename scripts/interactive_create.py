@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import calendar_ops
+    from . import calendar_ops, conflict_checker
 except ImportError:  # Allows running as: python3 scripts/interactive_create.py demo
     import calendar_ops  # type: ignore
+    import conflict_checker  # type: ignore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -131,7 +132,11 @@ def build_confirmation_summary(draft: dict[str, Any]) -> dict[str, Any]:
     return _result(True, data={"summary": "\n".join(lines)})
 
 
-def save_pending_confirmation(session_key: str, draft: dict[str, Any]) -> dict[str, Any]:
+def save_pending_confirmation(
+    session_key: str,
+    draft: dict[str, Any],
+    conflict_check: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Save a draft by session key; Calendar.app is not written until confirm."""
     summary_result = build_confirmation_summary(draft)
     if not summary_result["ok"]:
@@ -146,6 +151,8 @@ def save_pending_confirmation(session_key: str, draft: dict[str, Any]) -> dict[s
         "draft": normalized_draft,
         "summary": summary_result["data"]["summary"],
     }
+    if conflict_check is not None:
+        pending["conflict_check"] = conflict_check
     try:
         store = _read_pending_store()
         store.setdefault("sessions", {})[session_key] = pending
@@ -306,20 +313,38 @@ def _create_draft_from_args(args: argparse.Namespace) -> dict[str, Any]:
     if draft_data["missing_fields"] or draft_data["invalid_fields"]:
         return _result(False, data=draft_data, error="Draft is incomplete or invalid.")
 
-    save_result = save_pending_confirmation(args.session_key, draft_data["draft"])
+    conflict_check = None
+    if args.check_conflict:
+        conflict_result = conflict_checker.check_conflicts(
+            draft_data["draft"]["calendar"],
+            draft_data["draft"]["start"],
+            draft_data["draft"]["end"],
+        )
+        if not conflict_result["ok"]:
+            return conflict_result
+        conflict_check = conflict_result["data"]
+
+    save_result = save_pending_confirmation(
+        args.session_key,
+        draft_data["draft"],
+        conflict_check=conflict_check,
+    )
     if not save_result["ok"]:
         return save_result
 
-    return _result(
-        True,
-        data={
-            "draft": draft_data["draft"],
-            "missing_fields": draft_data["missing_fields"],
-            "invalid_fields": draft_data["invalid_fields"],
-            "pending": save_result["data"]["pending"],
-            "summary": save_result["data"]["pending"]["summary"],
-        },
-    )
+    data = {
+        "draft": draft_data["draft"],
+        "missing_fields": draft_data["missing_fields"],
+        "invalid_fields": draft_data["invalid_fields"],
+        "pending": save_result["data"]["pending"],
+        "summary": save_result["data"]["pending"]["summary"],
+    }
+    if conflict_check is not None:
+        data["conflict_check"] = conflict_check
+        data["has_conflict"] = conflict_check["has_conflict"]
+        data["conflicts"] = conflict_check["conflicts"]
+        data["suggested_slots"] = conflict_check["suggested_slots"]
+    return _result(True, data=data)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -337,6 +362,7 @@ def _build_parser() -> argparse.ArgumentParser:
     create_draft.add_argument("--end", required=True, help="ISO datetime, e.g. 2026-04-18T16:00:00.")
     create_draft.add_argument("--location", default="", help="Optional event location.")
     create_draft.add_argument("--notes", default="", help="Optional event notes.")
+    create_draft.add_argument("--check-conflict", action="store_true", help="Attach a read-only conflict check.")
 
     show_pending = subparsers.add_parser("show-pending", help="Show pending confirmation for a session.")
     show_pending.add_argument("--session-key", required=True, help="Stable caller/session id.")

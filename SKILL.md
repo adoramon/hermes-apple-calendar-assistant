@@ -97,11 +97,11 @@ you cannot access the calendar unless the script actually fails.
 For create requests, first parse natural language when useful:
 
 ```bash
-python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/nl_draft_parser.py parse "<user_text>"
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/nlp_event_parser.py parse "<user_text>"
 ```
 
 The parser only returns a draft. It does not save pending state and does not
-write Calendar.app.
+write Calendar.app. It must never produce `飞行计划` as a normal create target.
 
 For create requests, infer or ask for:
 
@@ -120,7 +120,7 @@ Suggest the calendar from context:
 - couple/shared partner tasks: `夫妻计划`
 
 If required fields are missing, ask follow-up questions. Once complete, create a
-pending draft:
+pending draft with conflict checking enabled by default:
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py create-draft \
@@ -130,10 +130,13 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/intera
   --start "<start>" \
   --end "<end>" \
   --location "<location>" \
-  --notes "<notes>"
+  --notes "<notes>" \
+  --check-conflict
 ```
 
-Show the returned `summary`. Only after the user explicitly confirms, run:
+Show the returned `summary`, draft fields, and any `conflict_check` result. If
+`has_conflict` is true, summarize `conflicts` and `suggested_slots`; do not
+change the time automatically. Only after the user explicitly confirms, run:
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py confirm --session-key "<session_key>"
@@ -145,15 +148,9 @@ If the user cancels:
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/interactive_create.py cancel --session-key "<session_key>"
 ```
 
-Before saving or confirming a create draft, check conflicts when start/end are
-known:
-
-```bash
-python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/conflict_detector.py check --calendar "<calendar>" --start "<start>" --end "<end>"
-```
-
-If conflicts exist, summarize them and ask whether the user still wants to
-continue. Creating the event still requires explicit confirmation.
+Creating the event always requires explicit confirmation. The confirm command
+uses the original pending draft time unless the user asks to change the draft and
+confirms the revised version.
 
 ## Update Rules
 
@@ -187,11 +184,13 @@ For reminder-like requests, scan upcoming events and return JSON-derived
 candidates only:
 
 ```bash
-python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/upcoming_reminders.py scan --minutes 60
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/reminder_worker.py scan
 ```
 
 Do not send WeChat, Telegram, Calendar alarms, or system notifications in
-v2.0-alpha. Summarize the returned candidates in WeChat-friendly text.
+v2.0-alpha. The reminder worker also has a launchd template for background
+scanning, but Hermes conversations should only summarize returned candidates in
+WeChat-friendly text.
 
 ## Flight Location Enhancement
 

@@ -69,9 +69,12 @@ hermes-apple-calendar-assistant/
 │   └── flight_pending.json
 ├── deploy/
 │   └── launchd/
-│       └── com.adoramon.hermes-apple-calendar-flight-auto-enhancer.plist
+│       ├── com.adoramon.hermes-apple-calendar-flight-auto-enhancer.plist
+│       └── com.adoramon.hermes-apple-calendar-reminder-worker.plist
 ├── docs/
-│   └── flight-auto-enhancer.md
+│   ├── reminder-worker.md
+│   ├── flight-auto-enhancer.md
+│   └── v2-roadmap.md
 └── scripts/
     ├── calendar_ops.py
     ├── interactive_create.py
@@ -79,9 +82,11 @@ hermes-apple-calendar-assistant/
     ├── flight_watcher.py
     ├── flight_enhancer.py
     ├── flight_auto_enhancer.py
-    ├── nl_draft_parser.py
-    ├── conflict_detector.py
+    ├── nlp_event_parser.py
+    ├── conflict_checker.py
+    ├── reminder_worker.py
     ├── upcoming_reminders.py
+    ├── settings.py
     └── util.py
 ```
 
@@ -122,19 +127,19 @@ python3 scripts/interactive_create.py cancel --session-key "wechat_user_001"
 Parse a natural-language create request into a draft:
 
 ```bash
-python3 scripts/nl_draft_parser.py parse "明天15:00-16:00在国贸和客户开会"
+python3 scripts/nlp_event_parser.py parse "明天下午三点和王总开会"
 ```
 
 Check conflicts for a proposed event window:
 
 ```bash
-python3 scripts/conflict_detector.py check --calendar "个人计划" --start "2026-04-18T15:00:00" --end "2026-04-18T16:00:00"
+python3 scripts/conflict_checker.py check --calendar "商务计划" --start "2026-04-27T15:00:00" --end "2026-04-27T16:00:00"
 ```
 
-Scan upcoming reminder candidates:
+Scan reminder candidates:
 
 ```bash
-python3 scripts/upcoming_reminders.py scan --minutes 60
+python3 scripts/reminder_worker.py scan
 ```
 
 Scan flight events:
@@ -178,14 +183,33 @@ python3 scripts/flight_auto_enhancer.py run
 See [docs/flight-auto-enhancer.md](docs/flight-auto-enhancer.md) for install,
 uninstall, log, and `flight_seen.json` reset instructions.
 
+Reminder scanning can also run as a launchd task:
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-reminder-worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+```
+
+The reminder worker launchd task runs every 1 minute and calls:
+
+```bash
+python3 scripts/reminder_worker.py scan
+```
+
+See [docs/reminder-worker.md](docs/reminder-worker.md) for manual run,
+install, uninstall, log, and `reminder_seen.json` reset instructions.
+
 ## Verification
 
 ```bash
-python3 -m py_compile scripts/calendar_ops.py scripts/interactive_create.py scripts/flight_parser.py scripts/flight_watcher.py scripts/flight_enhancer.py scripts/flight_auto_enhancer.py scripts/nl_draft_parser.py scripts/conflict_detector.py scripts/upcoming_reminders.py scripts/util.py
+python3 -m py_compile scripts/*.py
 python3 -m json.tool data/state.json
 python3 -m json.tool data/pending_confirmations.json
 python3 -m json.tool data/flight_seen.json
 python3 -m json.tool data/flight_pending.json
+python3 -m json.tool data/reminder_seen.json
 python3 -m unittest tests.test_flight_parser
 ```
 ## Current Status
@@ -203,6 +227,7 @@ Added in v2.0-alpha:
 - Natural-language draft parsing
 - Conflict detection
 - Upcoming reminder candidate scanning
+- Reminder worker idempotency and launchd template
 
 Still out of scope:
 

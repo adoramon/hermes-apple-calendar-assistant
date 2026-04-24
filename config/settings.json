@@ -17,5 +17,12 @@
   "flight_calendar": "飞行计划",
   "flight_scan_days": 30,
   "default_query_days": 7,
+  "default_event_duration_minutes": 60,
+  "conflict_check_window_days": 30,
+  "reminder_scan_minutes": 180,
+  "reminder_default_offsets_minutes": [
+    15,
+    60
+  ],
   "confirmation_required": true
 }
