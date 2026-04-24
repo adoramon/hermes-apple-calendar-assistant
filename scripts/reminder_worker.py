@@ -158,6 +158,7 @@ def scan_reminders() -> dict[str, Any]:
                     continue
 
                 reminder = {
+                    "fingerprint": key,
                     "calendar": calendar_name,
                     "title": event.get("title", ""),
                     "start": event.get("start", ""),
@@ -182,9 +183,8 @@ def scan_reminders() -> dict[str, Any]:
     _write_seen_store(seen_store)
     return util.json_ok(
         {
-            "scan_start": scan_start,
-            "scan_end": scan_end,
-            "offsets_minutes": offsets,
+            "scan_minutes": scan_minutes,
+            "offsets": offsets,
             "reminders": reminders,
             "skipped": skipped,
         }

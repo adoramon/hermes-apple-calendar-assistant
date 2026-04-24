@@ -4,7 +4,7 @@
 reminder candidates. It does not send WeChat, Telegram, system notifications, or
 Calendar alarms.
 
-## Behavior
+## 功能说明
 
 - Reads `read_calendars`, `reminder_scan_minutes`, and
   `reminder_default_offsets_minutes` from `config/settings.json`
@@ -15,6 +15,7 @@ Calendar alarms.
 - Only reads Calendar.app
 - Does not modify, create, or delete events
 - Does not access external networks
+- 当前阶段不负责主动发送消息，不发送微信、Telegram、系统通知或 Calendar alarm
 
 ## 手动运行
 
@@ -31,6 +32,7 @@ Output shape:
   "data": {
     "reminders": [
       {
+        "fingerprint": "abc123:15",
         "calendar": "商务计划",
         "title": "客户会议",
         "start": "2026年4月27日 星期一 15:00:00",
