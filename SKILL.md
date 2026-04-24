@@ -158,7 +158,24 @@ Make clear that 1.0 deletes the first exact-title match in the target calendar.
 
 ## Flight Location Enhancement
 
-For flight enhancement, scan future flight events:
+Flight location enhancement has two modes:
+
+- Background automatic enhancement is handled by the user-level launchd task.
+- Hermes conversations may run one-off scans or inspect pending/manual tasks, but
+  Hermes is not responsible for continuous monitoring.
+
+The launchd task calls:
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/flight_auto_enhancer.py run
+```
+
+The automatic enhancer scans future `飞行计划` events, parses the departure
+airport and terminal from the title, and writes only the original event
+`location` field. It must not modify the title, start time, end time, notes,
+Travel Time, reminders, or alarms. It must not create or delete any event.
+
+For manual review-style enhancement, scan future flight events:
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/flight_watcher.py scan --days 30
@@ -167,6 +184,7 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/flight
 The scanner parses flight titles, extracts departure airport and terminal, and
 creates pending location enhancement tasks. It must not:
 
+- modify title
 - modify start/end time
 - set Travel Time
 - set reminders or alarms

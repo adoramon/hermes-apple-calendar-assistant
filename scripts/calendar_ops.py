@@ -42,6 +42,15 @@ def _escape_applescript_text(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _normalize_calendar_text(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"", "missing value", "null", "none"}:
+        return ""
+    return text
+
+
 def _parse_datetime(value: datetime | date | str | None) -> datetime | None:
     if value is None:
         return None
@@ -163,8 +172,8 @@ tell application "Calendar"
     set output to ""
     repeat with ev in matchingEvents
         set eventTitle to summary of ev as text
-        set eventStart to start date of ev as text
-        set eventEnd to end date of ev as text
+        set eventStart to (start date of ev) as text
+        set eventEnd to (end date of ev) as text
         set eventLocation to ""
         set eventNotes to ""
         try
@@ -194,8 +203,8 @@ end tell
                 "title": title,
                 "start": starts_at,
                 "end": ends_at,
-                "location": location,
-                "notes": notes,
+                "location": _normalize_calendar_text(location),
+                "notes": _normalize_calendar_text(notes),
             }
         )
     return _result(True, data={"events": events})
@@ -330,6 +339,79 @@ end tell
     )
 
 
+def update_event_location_exact(
+    calendar_name: str,
+    title: str,
+    start_text: str,
+    end_text: str,
+    location: str,
+) -> dict[str, Any]:
+    """Update only the location field for one exact title+start+end match."""
+    if not title:
+        return _result(False, error="title is required.")
+    if not start_text or not end_text:
+        return _result(False, error="start_text and end_text are required.")
+
+    calendar_name_escaped = _escape_applescript_text(calendar_name)
+    title_escaped = _escape_applescript_text(title)
+    start_text_escaped = _escape_applescript_text(start_text)
+    end_text_escaped = _escape_applescript_text(end_text)
+    location_escaped = _escape_applescript_text(location)
+
+    script = f"""
+tell application "Calendar"
+    set targetCalendar to calendar "{calendar_name_escaped}"
+    set matches to events of targetCalendar whose summary is "{title_escaped}"
+    set matchedCount to 0
+    set targetEvent to missing value
+    repeat with ev in matches
+        set eventStartText to (start date of ev) as text
+        set eventEndText to (end date of ev) as text
+        if eventStartText is "{start_text_escaped}" and eventEndText is "{end_text_escaped}" then
+            set matchedCount to matchedCount + 1
+            set targetEvent to ev
+        end if
+    end repeat
+    if matchedCount is 0 then
+        return "NOT_FOUND"
+    end if
+    if matchedCount is greater than 1 then
+        return "AMBIGUOUS"
+    end if
+    set originalLocation to ""
+    try
+        set originalLocation to location of targetEvent as text
+    end try
+    set location of targetEvent to "{location_escaped}"
+    return (uid of targetEvent as text) & tab & (summary of targetEvent as text) & tab & originalLocation & tab & (location of targetEvent as text)
+end tell
+""".strip()
+
+    ok, stdout, error = _run_osascript(script)
+    if not ok:
+        return _result(False, error=error)
+    if stdout == "NOT_FOUND":
+        return _result(False, error="No event found with the exact title/start/end identity.")
+    if stdout == "AMBIGUOUS":
+        return _result(False, error="Multiple events matched the same title/start/end identity.")
+
+    fields = stdout.split("\t", maxsplit=3)
+    uid = fields[0] if len(fields) > 0 else ""
+    updated_title = fields[1] if len(fields) > 1 else title
+    original_location = _normalize_calendar_text(fields[2] if len(fields) > 2 else "")
+    updated_location = _normalize_calendar_text(fields[3] if len(fields) > 3 else location)
+    return _result(
+        True,
+        data={
+            "uid": uid,
+            "title": updated_title,
+            "original_location": original_location,
+            "location": updated_location,
+            "updated_fields": ["location"],
+        },
+    )
+
+
 def delete_event(calendar_name: str, title: str) -> dict[str, Any]:
     """Delete the first event with an exact title match in the target calendar."""
     calendar_name_escaped = _escape_applescript_text(calendar_name)
@@ -389,6 +471,16 @@ def _build_parser() -> argparse.ArgumentParser:
     delete.add_argument("title")
     delete.add_argument("--yes", action="store_true", help="Required to confirm deletion.")
 
+    update_location = subparsers.add_parser(
+        "update-location-exact",
+        help="Update location for one exact title+start+end match.",
+    )
+    update_location.add_argument("calendar_name")
+    update_location.add_argument("title")
+    update_location.add_argument("start_text")
+    update_location.add_argument("end_text")
+    update_location.add_argument("location")
+
     return parser
 
 
@@ -424,6 +516,14 @@ def main(argv: list[str] | None = None) -> int:
             result = _result(False, error="Refusing to delete without --yes.")
         else:
             result = delete_event(args.calendar_name, args.title)
+    elif args.command == "update-location-exact":
+        result = update_event_location_exact(
+            args.calendar_name,
+            args.title,
+            args.start_text,
+            args.end_text,
+            args.location,
+        )
     else:
         parser.error(f"Unknown command: {args.command}")
 

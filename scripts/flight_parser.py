@@ -13,6 +13,7 @@ FLIGHT_NO_RE = re.compile(r"(?<![A-Z0-9])([A-Z]{2}|[A-Z][0-9]|[0-9][A-Z])\s?(\d{
 ROUTE_DASH_RE = re.compile(r"([\u4e00-\u9fa5A-Za-z0-9]+?)(?:-|－|—|–|->|→)([\u4e00-\u9fa5A-Za-z0-9]+)")
 ROUTE_TO_RE = re.compile(r"([\u4e00-\u9fa5A-Za-z]{2,20})到([\u4e00-\u9fa5A-Za-z]{2,20}?)(?:的)?航班")
 TERMINAL_SUFFIX_RE = re.compile(r"^(.*?)(T[1-4])$", re.I)
+TERMINAL_WORD_RE = re.compile(r"^(.*?)([1-4])号?航站楼$", re.I)
 
 
 def _result(ok: bool, data: Any = None, error: str | None = None) -> dict[str, Any]:
@@ -37,6 +38,11 @@ def _split_terminal(segment: str) -> tuple[str | None, str | None]:
     if match:
         airport = match.group(1) or None
         terminal = match.group(2).upper()
+        return airport, terminal
+    match = TERMINAL_WORD_RE.match(cleaned)
+    if match:
+        airport = match.group(1) or None
+        terminal = f"T{match.group(2)}"
         return airport, terminal
     return cleaned or None, None
 
