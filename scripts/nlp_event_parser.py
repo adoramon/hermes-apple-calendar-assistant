@@ -87,6 +87,12 @@ def _parse_date(text: str, today: date) -> tuple[date | None, list[str], list[st
         monday = today - timedelta(days=today.weekday())
         return monday + timedelta(days=7 + weekday), [next_week.group(0)], assumptions
 
+    current_week = re.search(r"本周([一二三四五六日天])", text)
+    if current_week:
+        weekday = WEEKDAY_MAP[current_week.group(1)]
+        monday = today - timedelta(days=today.weekday())
+        return monday + timedelta(days=weekday), [current_week.group(0)], assumptions
+
     this_week = re.search(r"(?:周|星期)([一二三四五六日天])", text)
     if this_week:
         weekday = WEEKDAY_MAP[this_week.group(1)]
@@ -194,8 +200,7 @@ def parse_event_text(text: str, today: date | None = None) -> dict[str, Any]:
     event_date, date_consumed, date_assumptions = _parse_date(text, base_date)
     assumptions.extend(date_assumptions)
     if event_date is None:
-        event_date = base_date
-        assumptions.append("date_defaulted_to_today")
+        return util.json_error("Could not parse event date.")
 
     start, time_consumed, time_assumptions = _parse_time(text, event_date)
     assumptions.extend(time_assumptions)
@@ -205,8 +210,7 @@ def parse_event_text(text: str, today: date | None = None) -> dict[str, Any]:
     assumptions.extend(calendar_assumptions)
 
     if start is None:
-        start = datetime.combine(event_date, time(9, 0))
-        assumptions.append("time_defaulted_to_09:00")
+        return util.json_error("Could not parse event time.")
 
     duration_minutes = settings.get_default_event_duration_minutes()
     end = start + timedelta(minutes=duration_minutes)
@@ -243,7 +247,17 @@ def parse_event_text(text: str, today: date | None = None) -> dict[str, Any]:
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
-    parser = argparse.ArgumentParser(description="Parse natural-language event text into a draft.")
+    parser = argparse.ArgumentParser(
+        description="Parse natural-language event text into a draft.",
+        epilog=(
+            "Examples:\n"
+            "  python3 scripts/nlp_event_parser.py parse \"明天下午三点和王总开会\"\n"
+            "  python3 scripts/nlp_event_parser.py parse \"周五晚上和家人吃饭\"\n"
+            "  python3 scripts/nlp_event_parser.py parse \"下周一上午10点去国贸见客户\"\n"
+            "  python3 scripts/nlp_event_parser.py parse \"后天上午十点体检\""
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     parse = subparsers.add_parser("parse", help="Parse natural-language event text.")
     parse.add_argument("text")
