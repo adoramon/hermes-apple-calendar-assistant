@@ -18,6 +18,15 @@ Apple Calendar
 
 仍不真实发送微信、Telegram 或任何外部网络消息。
 
+### Phase 25 Safety Gate
+
+- 新增 `real_send_gate`，默认 `enabled=false`。
+- 真实发送需要 `real_send_enabled=true`、gate enabled、channel 白名单和确认短语。
+- 本阶段即使全部满足仍返回 `real send adapter not implemented`。
+- `outbox_consumer --mode real` 不会标记 sent；如有 pending，会标记
+  `failed_real_send_blocked` 并记录 reason。
+- 新增回滚文档：`docs/rollback.md`。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

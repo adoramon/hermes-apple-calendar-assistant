@@ -43,5 +43,12 @@
       "notes": "reserved for future real Hermes dispatch"
     }
   },
+  "real_send_gate": {
+    "enabled": false,
+    "require_manual_config_change": true,
+    "require_confirm_phrase": "ENABLE_REAL_SEND",
+    "allowed_channels": [],
+    "audit_required": true
+  },
   "confirmation_required": true
 }

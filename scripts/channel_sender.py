@@ -75,7 +75,21 @@ def dry_run_send(message: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def send_message(message: dict[str, Any], mode: str) -> dict[str, Any]:
+def _real_send_block(message: dict[str, Any], confirm_phrase: str | None = None) -> dict[str, Any]:
+    """Validate real-send gates, then reject because no real adapter exists."""
+    if not settings.get_outbox_real_send_enabled():
+        return _json_error("real send is not implemented")
+    if not settings.is_real_send_gate_enabled():
+        return _json_error("real send gate is disabled")
+    channel = message.get("channel")
+    if channel not in settings.get_real_send_allowed_channels():
+        return _json_error("real send channel is not allowed")
+    if confirm_phrase != settings.get_real_send_confirm_phrase():
+        return _json_error("real send confirm phrase mismatch")
+    return _json_error("real send adapter not implemented")
+
+
+def send_message(message: dict[str, Any], mode: str, confirm_phrase: str | None = None) -> dict[str, Any]:
     """Send one outbound message using the configured mode.
 
     Only dry_run is implemented. The real branch is reserved and always rejected
@@ -84,7 +98,5 @@ def send_message(message: dict[str, Any], mode: str) -> dict[str, Any]:
     if mode == DRY_RUN_MODE:
         return dry_run_send(message)
     if mode == REAL_MODE:
-        if not settings.get_outbox_real_send_enabled():
-            return _json_error("real send is not implemented")
-        return _json_error("real send is not implemented")
+        return _real_send_block(message, confirm_phrase=confirm_phrase)
     return _json_error("unsupported send mode")

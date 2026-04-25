@@ -37,6 +37,13 @@ DEFAULT_OUTBOX_SETTINGS = {
         "notes": "reserved for future real Hermes dispatch",
     },
 }
+DEFAULT_REAL_SEND_GATE = {
+    "enabled": False,
+    "require_manual_config_change": True,
+    "require_confirm_phrase": "ENABLE_REAL_SEND",
+    "allowed_channels": [],
+    "audit_required": True,
+}
 
 
 def load_settings() -> dict[str, Any]:
@@ -203,3 +210,43 @@ def get_hermes_channel_settings() -> dict[str, Any]:
     if isinstance(value, dict):
         return dict(value)
     return dict(DEFAULT_OUTBOX_SETTINGS["hermes_channel"])
+
+
+def get_real_send_gate() -> dict[str, Any]:
+    """Return normalized real-send gate settings."""
+    current_settings = load_settings()
+    raw = current_settings.get("real_send_gate")
+    if not isinstance(raw, dict):
+        raw = {}
+    return {
+        "enabled": raw.get("enabled")
+        if isinstance(raw.get("enabled"), bool)
+        else DEFAULT_REAL_SEND_GATE["enabled"],
+        "require_manual_config_change": raw.get("require_manual_config_change")
+        if isinstance(raw.get("require_manual_config_change"), bool)
+        else DEFAULT_REAL_SEND_GATE["require_manual_config_change"],
+        "require_confirm_phrase": raw.get("require_confirm_phrase")
+        if isinstance(raw.get("require_confirm_phrase"), str) and raw.get("require_confirm_phrase")
+        else DEFAULT_REAL_SEND_GATE["require_confirm_phrase"],
+        "allowed_channels": _string_list(
+            raw.get("allowed_channels"), tuple(DEFAULT_REAL_SEND_GATE["allowed_channels"])
+        ),
+        "audit_required": raw.get("audit_required")
+        if isinstance(raw.get("audit_required"), bool)
+        else DEFAULT_REAL_SEND_GATE["audit_required"],
+    }
+
+
+def is_real_send_gate_enabled() -> bool:
+    """Return whether the final real-send gate is enabled."""
+    return bool(get_real_send_gate()["enabled"])
+
+
+def get_real_send_confirm_phrase() -> str:
+    """Return the required phrase for real-send attempts."""
+    return str(get_real_send_gate()["require_confirm_phrase"])
+
+
+def get_real_send_allowed_channels() -> list[str]:
+    """Return channels allowed by the final real-send gate."""
+    return list(get_real_send_gate()["allowed_channels"])

@@ -28,6 +28,8 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 22-24 v2.0-rc 本机 Hermes 调度闭环准备：
   `hermes_dispatcher.py`、`channel_sender -> hermes_dispatcher` dry-run、
   本机闭环验收文档
+- Phase 25 v2.0-rc 真实发送前最终闸门与回滚策略：
+  `real_send_gate`、blocked real mode、outbox audit/result、rollback docs
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

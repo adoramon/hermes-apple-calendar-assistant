@@ -232,6 +232,8 @@ Outbox 安全边界：
 - Hermes 可以在用户明确确认后请求 dry-run 标记。
 - Hermes 不应调用任何外部网络发送接口。
 - Hermes 不应调用任何真实发送接口。
+- Hermes 不得尝试绕过 `real_send_gate`。
+- 当前真实发送不可用；用户要求真实发送时，应说明当前只支持 dry-run。
 - Hermes 不得删除 outbox 记录。
 - Hermes 不得修改 message 内容。
 - Hermes 只能读取 pending、查看 status、把 pending 标记为 `sent_dry_run`。

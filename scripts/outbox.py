@@ -105,11 +105,17 @@ def _existing_ids() -> set[str]:
 
 def build_outbox_record(message: dict[str, Any]) -> dict[str, Any]:
     """Build a pending dry-run outbox record for one outbound message."""
+    created_at = util.now_local_iso()
     return {
         "id": _record_id(message),
-        "created_at": util.now_local_iso(),
+        "created_at": created_at,
         "status": "pending",
         "message": message,
+        "result": None,
+        "audit": {
+            "created_at": created_at,
+            "source": "outbox",
+        },
     }
 
 
@@ -170,6 +176,9 @@ def _summarize_record(record: dict[str, Any]) -> dict[str, Any]:
     message = record.get("message")
     if not isinstance(message, dict):
         message = {}
+    result = record.get("result")
+    if not isinstance(result, dict):
+        result = {}
     return {
         "id": record.get("id", ""),
         "created_at": record.get("created_at", ""),
@@ -177,6 +186,13 @@ def _summarize_record(record: dict[str, Any]) -> dict[str, Any]:
         "channel": message.get("channel", ""),
         "recipient": message.get("recipient", ""),
         "message": message.get("message", ""),
+        "result": {
+            "mode": result.get("mode", ""),
+            "reason": result.get("reason", ""),
+            "processed_at": result.get("processed_at", ""),
+            "sender": result.get("sender", ""),
+            "dispatcher": result.get("dispatcher", ""),
+        },
     }
 
 

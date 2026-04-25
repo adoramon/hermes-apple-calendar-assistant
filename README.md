@@ -196,11 +196,27 @@ Outbox safety switches live in `config/settings.json`:
 }
 ```
 
+Final real-send gate:
+
+```json
+{
+  "real_send_gate": {
+    "enabled": false,
+    "require_manual_config_change": true,
+    "require_confirm_phrase": "ENABLE_REAL_SEND",
+    "allowed_channels": [],
+    "audit_required": true
+  }
+}
+```
+
 `send_mode` must remain `dry_run` in the current beta line. Any other value
 returns `ok=false` because real sending is not implemented yet. The consumer also
 skips channels outside `allowed_channels`, and caps each run by
 `max_messages_per_run`. See [docs/channel-sender.md](docs/channel-sender.md) for
 the pre-real-send channel sender abstraction and reserved Hermes channel design.
+See [docs/real-send-gate.md](docs/real-send-gate.md) for the final real-send
+gate, and [docs/rollback.md](docs/rollback.md) for rollback steps.
 
 Scan flight events:
 
