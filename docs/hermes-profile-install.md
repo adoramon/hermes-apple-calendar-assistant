@@ -110,6 +110,59 @@ python3 scripts/hermes_outbox_cli.py pending --limit 10
 python3 scripts/hermes_outbox_cli.py mark-dry-run-sent --id "<record_id>"
 ```
 
+## 启用 reminder worker dry-run outbox 链路
+
+`reminder_worker.py` 已支持作为 dry-run outbox 链路的上游 Worker。启用该模式时，
+它只读取 Calendar.app，生成 outbound message，并写入
+`data/outbox_messages.jsonl`；它不会真实发送微信、Telegram，也不会访问外部网络。
+
+建议用于 outbox 链路的命令是：
+
+```bash
+python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
+```
+
+如果要让 launchd 后台运行该链路，请确认
+`com.adoramon.hermes-apple-calendar-reminder-worker.plist` 的
+`ProgramArguments` 使用上面的参数。该任务每 1 分钟运行一次，stdout/stderr 写入：
+
+```text
+/Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.out.log
+/Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.err.log
+```
+
+安装：
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-reminder-worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+```
+
+卸载：
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+rm ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+```
+
+查看日志：
+
+```bash
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.out.log
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.err.log
+```
+
+通过 Hermes 查询 pending outbox：
+
+```bash
+python3 scripts/hermes_outbox_cli.py pending --limit 10
+```
+
+Hermes 应展示 pending messages，但不要自动标记为 `sent_dry_run`；只有用户明确确认
+已处理指定 record id 后，才调用 `mark-dry-run-sent`。
+
 ## 不启用真实发送
 
 当前配置应保持：

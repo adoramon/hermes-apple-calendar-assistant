@@ -250,6 +250,38 @@ The reminder worker launchd task runs every 1 minute and calls:
 python3 scripts/reminder_worker.py scan
 ```
 
+For the v2.0-beta dry-run outbox chain, reminder worker can also be run by
+launchd with outbound outbox writing enabled:
+
+```bash
+python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
+```
+
+In this mode it only reads Calendar.app and writes
+`data/outbox_messages.jsonl`. It does not send WeChat, Telegram, or any external
+network message. Install/uninstall is the same reminder worker LaunchAgent flow:
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-reminder-worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+```
+
+Logs:
+
+```bash
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.out.log
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.err.log
+```
+
+Hermes can inspect pending outbox messages with:
+
+```bash
+python3 scripts/hermes_outbox_cli.py pending --limit 10
+```
+
 See [docs/reminder-worker.md](docs/reminder-worker.md) for manual run,
 install, uninstall, log, and `reminder_seen.json` reset instructions.
 
