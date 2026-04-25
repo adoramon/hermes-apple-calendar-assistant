@@ -1,5 +1,42 @@
 # Release Notes
 
+## v2.0-beta
+
+v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、
+dry-run consumer、安全开关，以及 Hermes 本地读取接口。当前仍是 dry-run 阶段，
+不会真实发送微信、Telegram 或任何外部网络请求。
+
+### 当前状态
+
+- 已有本地提醒队列：`data/outbox_messages.jsonl`
+- 已有 outbound message 适配：`scripts/message_adapter.py`
+- 已有 dry-run outbox 写入：`reminder_worker.py --write-outbox`
+- 已有 dry-run consumer：`scripts/outbox_consumer.py`
+- 已有 Hermes 本地读取接口：`scripts/hermes_outbox_cli.py`
+- 暂不真实发送微信、Telegram 或外部网络消息
+
+### Hermes 本地接口
+
+```bash
+python3 scripts/hermes_outbox_cli.py pending --limit 10
+python3 scripts/hermes_outbox_cli.py status --id "<record_id>"
+python3 scripts/hermes_outbox_cli.py mark-dry-run-sent --id "<record_id>"
+```
+
+### 安全边界
+
+- outbox 当前只是本地 dry-run 队列。
+- Hermes 不得删除 outbox 记录。
+- Hermes 不得修改 message 内容。
+- Hermes 不得调用外部网络发送接口。
+- `sent_dry_run` 只表示本地 dry-run 消费完成，不代表真实发送。
+
+### 下一步建议
+
+- 接入 Hermes profile 的 tool/skill 配置。
+- 让 Hermes 对话按 `SKILL.md` 调用 `hermes_outbox_cli.py`。
+- 继续保持真实 sender 独立，等安全开关和确认流程稳定后再接入。
+
 ## v2.0-alpha
 
 v2.0-alpha 在 v1.0 的 Apple Calendar CRUD、确认式写入和飞行计划 location

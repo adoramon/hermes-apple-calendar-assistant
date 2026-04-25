@@ -186,6 +186,7 @@ Make clear that v2.0-alpha still deletes the first exact-title match in the targ
 - 当前 `reminder_worker.py` 只生成提醒候选 JSON
 - 当前阶段不主动发送微信或 Telegram
 - 是否启用 reminder worker launchd 由用户手动决定
+- outbox 只是本地 dry-run 队列，不代表真实发送完成
 
 用户询问即将提醒事项时，可调用：
 
@@ -194,6 +195,43 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/remind
 ```
 
 Hermes 对话中只总结返回的候选提醒，不安装 launchd，不持续后台监控。
+
+## Reminder And Outbox Rules
+
+当用户询问“有什么提醒”“待发送提醒”“待处理消息”或类似问题时，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_outbox_cli.py pending --limit 10
+```
+
+展示 pending messages，必须包含或保留每条记录的 `record_id`。不要自动标记为
+`sent_dry_run`，除非用户明确确认这些提醒已处理。
+
+当用户说“这些提醒已处理”“标记已处理”“确认发送完成”时，对用户指定的
+`record_id` 调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_outbox_cli.py mark-dry-run-sent --id "<record_id>"
+```
+
+如果用户没有明确指定是哪条提醒，先询问要标记的 `record_id` 或提醒内容，不要
+批量猜测。
+
+当用户询问某条提醒状态时，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_outbox_cli.py status --id "<record_id>"
+```
+
+Outbox 安全边界：
+
+- 当前阶段不真实发送微信。
+- 当前阶段不真实发送 Telegram。
+- 当前阶段 outbox 只是本地 dry-run 队列。
+- Hermes 不应调用任何外部网络发送接口。
+- Hermes 不得删除 outbox 记录。
+- Hermes 不得修改 message 内容。
+- Hermes 只能读取 pending、查看 status、把 pending 标记为 `sent_dry_run`。
 
 ## Flight Location Enhancement
 

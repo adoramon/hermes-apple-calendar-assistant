@@ -14,6 +14,8 @@ Current version: `v2.0-beta`
   `outbox.send_mode=dry_run`、`allowed_channels`、`max_messages_per_run`
 - Phase 14 Hermes 本地消费接口：
   `pending`、`status`、`mark-dry-run-sent`
+- Phase 15 Hermes Skill 调用规则收口：
+  提醒查询、状态查看、dry-run 已处理标记和 outbox 风险边界
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

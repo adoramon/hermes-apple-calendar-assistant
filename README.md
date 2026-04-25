@@ -18,6 +18,7 @@ v2.0-alpha 已支持：
 - outbox dry-run 队列与 dry-run consumer
 - outbox 真实发送前安全开关：`send_mode`、`allowed_channels`、
   `max_messages_per_run`
+- Hermes 本地 outbox 读取接口：`pending`、`status`、`mark-dry-run-sent`
 - `飞行计划` location 自动增强 launchd 后台任务
 
 v2.0-alpha excludes:
@@ -272,9 +273,10 @@ Current dry-run reminder flow:
 ```text
 Calendar.app
   -> reminder_worker.py scan --format outbound --write-outbox
+  -> message_adapter.py
   -> data/outbox_messages.jsonl
-  -> outbox_consumer.py dry-run
-  -> status: sent_dry_run
+  -> hermes_outbox_cli.py pending/status/mark-dry-run-sent
+  -> Hermes 展示 / 用户确认
 ```
 
 This flow still does not send Telegram, WeChat, or external network requests.
@@ -284,6 +286,22 @@ See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
 uninstall, status, log, and manual trigger instructions.
 See [docs/hermes-outbox-cli.md](docs/hermes-outbox-cli.md) for the Hermes-facing
 local pending/status/mark interface.
+
+v2.0-beta 当前链路：
+
+```text
+Calendar.app
+  ↓
+reminder_worker
+  ↓
+message_adapter
+  ↓
+outbox_messages.jsonl
+  ↓
+hermes_outbox_cli
+  ↓
+Hermes 展示 / 用户确认
+```
 
 ## Verification
 
