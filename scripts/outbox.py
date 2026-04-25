@@ -41,7 +41,7 @@ def _record_id(message: dict[str, Any]) -> str:
     return hashlib.sha1(_message_identity(message).encode("utf-8")).hexdigest()
 
 
-def _read_outbox_records() -> list[dict[str, Any]]:
+def load_outbox_records() -> list[dict[str, Any]]:
     """Read all valid outbox records from the JSONL queue."""
     if not OUTBOX_PATH.exists():
         return []
@@ -58,10 +58,45 @@ def _read_outbox_records() -> list[dict[str, Any]]:
     return records
 
 
+def save_outbox_records_atomic(records: list[dict[str, Any]]) -> None:
+    """Persist outbox records atomically as JSONL."""
+    util.ensure_dir(OUTBOX_PATH.parent)
+    tmp_path = OUTBOX_PATH.with_suffix(".jsonl.tmp")
+    with tmp_path.open("w", encoding="utf-8") as fh:
+        for record in records:
+            fh.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
+            fh.write("\n")
+    tmp_path.replace(OUTBOX_PATH)
+
+
+def update_outbox_status(record_id: str, status: str, result: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Update one outbox record status and optional result by id."""
+    records = load_outbox_records()
+    updated_record = None
+    for record in records:
+        if record.get("id") != record_id:
+            continue
+        record["status"] = status
+        if result is not None:
+            record["result"] = result
+        updated_record = record
+        break
+    if updated_record is None:
+        return {"ok": False, "error": "outbox_record_not_found", "record": None}
+    save_outbox_records_atomic(records)
+    return {"ok": True, "error": None, "record": updated_record}
+
+
+def get_pending_outbox(limit: int = 20) -> list[dict[str, Any]]:
+    """Return pending outbox records, oldest first."""
+    pending = [record for record in load_outbox_records() if record.get("status") == "pending"]
+    return pending[: max(limit, 0)]
+
+
 def _existing_ids() -> set[str]:
     """Return all ids already present in the outbox."""
     ids = set()
-    for record in _read_outbox_records():
+    for record in load_outbox_records():
         record_id = record.get("id")
         if isinstance(record_id, str) and record_id:
             ids.add(record_id)
@@ -126,8 +161,23 @@ def append_outbox_messages(messages: list[dict[str, Any]]) -> dict[str, Any]:
 
 def load_recent_outbox(limit: int = 20) -> list[dict[str, Any]]:
     """Load recent outbox records, newest first."""
-    records = _read_outbox_records()
+    records = load_outbox_records()
     return list(reversed(records[-max(limit, 0) :]))
+
+
+def _summarize_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Return a compact record shape for list output."""
+    message = record.get("message")
+    if not isinstance(message, dict):
+        message = {}
+    return {
+        "id": record.get("id", ""),
+        "created_at": record.get("created_at", ""),
+        "status": record.get("status", ""),
+        "channel": message.get("channel", ""),
+        "recipient": message.get("recipient", ""),
+        "message": message.get("message", ""),
+    }
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -143,7 +193,8 @@ def main(argv: list[str] | None = None) -> int:
     """Run the command-line interface."""
     args = _build_parser().parse_args(argv)
     if args.command == "list":
-        result = util.json_ok({"records": load_recent_outbox(args.limit)})
+        records = [_summarize_record(record) for record in load_recent_outbox(args.limit)]
+        result = util.json_ok({"records": records})
     else:
         raise AssertionError(args.command)
     print(json.dumps(result, ensure_ascii=False, indent=2))
