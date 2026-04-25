@@ -155,6 +155,18 @@ Dry-run consume pending outbox messages:
 python3 scripts/outbox_consumer.py dry-run --limit 10
 ```
 
+Hermes local outbox CLI:
+
+```bash
+python3 scripts/hermes_outbox_cli.py pending --limit 10
+python3 scripts/hermes_outbox_cli.py status --id "<record_id>"
+python3 scripts/hermes_outbox_cli.py mark-dry-run-sent --id "<record_id>"
+```
+
+The Hermes CLI only reads pending messages, checks status, and marks pending
+records as `sent_dry_run`. It cannot delete records, modify message content, mark
+real `sent`, or send network requests.
+
 Outbox safety switches live in `config/settings.json`:
 
 ```json
@@ -270,6 +282,8 @@ The outbox consumer is guarded by `send_mode=dry_run`, channel allow-listing, an
 per-run message limits before any future real sender is added.
 See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
 uninstall, status, log, and manual trigger instructions.
+See [docs/hermes-outbox-cli.md](docs/hermes-outbox-cli.md) for the Hermes-facing
+local pending/status/mark interface.
 
 ## Verification
 

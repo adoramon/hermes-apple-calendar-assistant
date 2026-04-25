@@ -12,6 +12,8 @@ Current version: `v2.0-beta`
 - outbox consumer launchd template
 - Phase 13 安全开关与配置收口：
   `outbox.send_mode=dry_run`、`allowed_channels`、`max_messages_per_run`
+- Phase 14 Hermes 本地消费接口：
+  `pending`、`status`、`mark-dry-run-sent`
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha
