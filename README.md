@@ -36,6 +36,12 @@ Acceptance summary: the dry-run reminder/outbox chain has been validated for
 local operation. It still does not send WeChat, Telegram, Hermes push, or any
 external network message.
 
+Real-send channel decision: prefer Hermes local callback / local CLI. Telegram
+Bot API and direct WeChat automation are not selected for now because they would
+introduce tokens, external network requests, or bypass Hermes scheduling and
+audit. See [docs/real-send-channel-options.md](docs/real-send-channel-options.md)
+and [docs/decision-records/ADR-001-real-send-channel.md](docs/decision-records/ADR-001-real-send-channel.md).
+
 ## Calendar Policy
 
 Read calendars:

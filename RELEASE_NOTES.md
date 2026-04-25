@@ -27,6 +27,16 @@ Apple Calendar
   `failed_real_send_blocked` 并记录 reason。
 - 新增回滚文档：`docs/rollback.md`。
 
+### Phase 26 Real-send Channel Decision
+
+- 新增方案对比：`docs/real-send-channel-options.md`。
+- 新增 ADR：`docs/decision-records/ADR-001-real-send-channel.md`。
+- 推荐方案 A：Hermes 本地回调 / 本地 CLI。
+- 暂不选择方案 B Telegram Bot API。
+- 暂不选择方案 C 微信通道。
+- 实现前必须确认 Hermes local dispatch CLI、`sunny-wechat-lite` outbound
+  API、profile 内部 tool 和用户二次确认策略。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

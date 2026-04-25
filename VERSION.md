@@ -30,6 +30,8 @@ Current version: `v2.0-rc local dispatch dry-run`
   本机闭环验收文档
 - Phase 25 v2.0-rc 真实发送前最终闸门与回滚策略：
   `real_send_gate`、blocked real mode、outbox audit/result、rollback docs
+- Phase 26 v2.0-rc 真实发送通道方案设计：
+  推荐 Hermes 本地回调 / 本地 CLI，暂不选择 Telegram Bot API 或微信自动化
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha
