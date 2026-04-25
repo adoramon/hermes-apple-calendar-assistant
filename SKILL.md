@@ -1,14 +1,14 @@
 ---
 name: apple-calendar-assistant
-description: Apple Calendar v2.0-alpha 日程查询、确认式写入、冲突检测、提醒候选扫描与飞行计划位置增强，适用于 macOS。
+description: Apple Calendar v2.0-beta dry-run readiness 日程查询、确认式写入、冲突检测、提醒候选扫描、dry-run outbox 与飞行计划位置增强，适用于 macOS。
 platforms: [macos]
 ---
 
-# Apple Calendar Assistant v2.0-alpha
+# Apple Calendar Assistant v2.0-beta dry-run readiness
 
 ## Scope
 
-Use this skill only for Apple Calendar Assistant v2.0-alpha:
+Use this skill only for Apple Calendar Assistant v2.0-beta dry-run readiness:
 
 - 查询日历行程
 - 创建日历行程
@@ -177,7 +177,7 @@ Only include flags for fields that should change.
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/calendar_ops.py delete "<calendar>" "<title>" --yes
 ```
 
-Make clear that v2.0-alpha still deletes the first exact-title match in the target calendar.
+Make clear that v2.0-beta dry-run readiness still deletes the first exact-title match in the target calendar.
 
 ## Upcoming Reminder Scan
 
