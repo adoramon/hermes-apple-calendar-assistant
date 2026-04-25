@@ -52,6 +52,57 @@ python3 scripts/outbox_consumer.py dry-run --limit 10
 }
 ```
 
+## 安装 launchd
+
+本仓库提供 dry-run consumer 的 launchd 模板，但不会自动安装：
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-outbox-consumer.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
+```
+
+安装后每 1 分钟运行一次：
+
+```bash
+/usr/bin/python3 scripts/outbox_consumer.py dry-run --limit 10
+```
+
+## 卸载 launchd
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
+rm ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
+```
+
+## 查看状态
+
+```bash
+launchctl list | grep com.adoramon.hermes-apple-calendar-outbox-consumer
+```
+
+如果没有输出，通常表示任务未加载。
+
+## 查看日志
+
+```bash
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.out.log
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.err.log
+```
+
+## 手动触发一次
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.adoramon.hermes-apple-calendar-outbox-consumer
+```
+
+也可以直接运行：
+
+```bash
+python3 scripts/outbox_consumer.py dry-run --limit 10
+```
+
 ## 当前阶段边界
 
 - 不发送 Telegram

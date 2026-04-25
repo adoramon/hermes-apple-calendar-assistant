@@ -67,7 +67,8 @@ hermes-apple-calendar-assistant/
 ├── deploy/
 │   └── launchd/
 │       ├── com.adoramon.hermes-apple-calendar-flight-auto-enhancer.plist
-│       └── com.adoramon.hermes-apple-calendar-reminder-worker.plist
+│       ├── com.adoramon.hermes-apple-calendar-reminder-worker.plist
+│       └── com.adoramon.hermes-apple-calendar-outbox-consumer.plist
 ├── docs/
 │   ├── reminder-worker.md
 │   ├── flight-auto-enhancer.md
@@ -139,6 +140,18 @@ Scan reminder candidates:
 python3 scripts/reminder_worker.py scan
 ```
 
+Write outbound reminder messages into the local dry-run outbox:
+
+```bash
+python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
+```
+
+Dry-run consume pending outbox messages:
+
+```bash
+python3 scripts/outbox_consumer.py dry-run --limit 10
+```
+
 Scan flight events:
 
 ```bash
@@ -204,6 +217,35 @@ python3 scripts/reminder_worker.py scan
 
 See [docs/reminder-worker.md](docs/reminder-worker.md) for manual run,
 install, uninstall, log, and `reminder_seen.json` reset instructions.
+
+Outbox consumer dry-run can run as a separate launchd task:
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-outbox-consumer.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
+```
+
+The outbox consumer launchd task runs every 1 minute and calls:
+
+```bash
+python3 scripts/outbox_consumer.py dry-run --limit 10
+```
+
+Current dry-run reminder flow:
+
+```text
+Calendar.app
+  -> reminder_worker.py scan --format outbound --write-outbox
+  -> data/outbox_messages.jsonl
+  -> outbox_consumer.py dry-run
+  -> status: sent_dry_run
+```
+
+This flow still does not send Telegram, WeChat, or external network requests.
+See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
+uninstall, status, log, and manual trigger instructions.
 
 ## Verification
 
