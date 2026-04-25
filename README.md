@@ -2,11 +2,11 @@
 
 Apple Calendar Assistant 是一个 macOS-only Hermes custom skill，用于在
 `sunny-wechat-lite` profile 中操作 Calendar.app。当前开发线是
-`v2.0-alpha`。
+`v2.0-beta dry-run readiness`。
 
-## v2.0-alpha 功能列表
+## v2.0-beta Dry-run Readiness
 
-v2.0-alpha 已支持：
+v2.0-beta dry-run readiness 已支持：
 
 - 明确时间范围后查询 Apple Calendar 日程
 - 确认式创建、修改、删除日程
@@ -21,7 +21,7 @@ v2.0-alpha 已支持：
 - Hermes 本地 outbox 读取接口：`pending`、`status`、`mark-dry-run-sent`
 - `飞行计划` location 自动增强 launchd 后台任务
 
-v2.0-alpha excludes:
+v2.0-beta dry-run readiness excludes:
 
 - Birthday reminders
 - Contacts, lunar birthday, or anniversary workflows
@@ -324,12 +324,13 @@ Stable from 1.0:
 - Flight location enhancement
 - launchd automatic flight location enhancement
 
-Added in v2.0-alpha:
+Added through v2.0-beta dry-run readiness:
 
 - Natural-language draft parsing
 - Conflict detection
 - Upcoming reminder candidate scanning
 - Reminder worker idempotency and launchd template
+- Local outbox queue, dry-run consumer, and Hermes local outbox CLI
 
 Still out of scope:
 

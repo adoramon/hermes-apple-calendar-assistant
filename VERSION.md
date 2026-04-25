@@ -1,8 +1,10 @@
 # Apple Calendar Assistant
 
-Current version: `v2.0-beta`
+Current version: `v2.0-beta dry-run readiness`
 
 ## v2.0.0-beta
+
+当前状态：`v2.0-beta dry-run readiness`
 
 变更记录：
 

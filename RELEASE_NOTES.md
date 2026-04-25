@@ -1,8 +1,8 @@
 # Release Notes
 
-## v2.0-beta
+## v2.0-beta Dry-run Readiness
 
-v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、
+当前状态是 `v2.0-beta dry-run readiness`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、
 dry-run consumer、安全开关，以及 Hermes 本地读取接口。当前仍是 dry-run 阶段，
 不会真实发送微信、Telegram 或任何外部网络请求。
 
