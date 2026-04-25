@@ -2,11 +2,11 @@
 
 Apple Calendar Assistant 是一个 macOS-only Hermes custom skill，用于在
 `sunny-wechat-lite` profile 中操作 Calendar.app。当前开发线是
-`v2.0-beta dry-run readiness`。
+`v2.0-beta dry-run accepted`。
 
-## v2.0-beta Dry-run Readiness
+## v2.0-beta Dry-run Accepted
 
-v2.0-beta dry-run readiness 已支持：
+v2.0-beta dry-run accepted 已支持：
 
 - 明确时间范围后查询 Apple Calendar 日程
 - 确认式创建、修改、删除日程
@@ -29,6 +29,10 @@ v2.0-beta dry-run readiness excludes:
 - Reminder/alarm enhancement or notification delivery
 - Native Swift helpers
 - Extra preparation events for flights
+
+Acceptance summary: the dry-run reminder/outbox chain has been validated for
+local operation. It still does not send WeChat, Telegram, Hermes push, or any
+external network message.
 
 ## Calendar Policy
 
@@ -331,6 +335,9 @@ Calendar.app
 ```
 
 This flow still does not send Telegram, WeChat, or external network requests.
+If `outbox_consumer` is enabled by launchd, it may consume pending outbox records
+quickly; in that case `hermes_outbox_cli.py pending --limit 10` can be empty even
+though reminders were scanned and marked `sent_dry_run`.
 The outbox consumer is guarded by `send_mode=dry_run`, channel allow-listing, and
 per-run message limits before any future real sender is added.
 See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
@@ -378,8 +385,18 @@ python3 -m json.tool data/pending_confirmations.json
 python3 -m json.tool data/flight_seen.json
 python3 -m json.tool data/flight_pending.json
 python3 -m json.tool data/reminder_seen.json
+launchctl list | grep com.adoramon.hermes-apple-calendar
+tail -n 100 logs/reminder_worker.out.log
+tail -n 100 logs/outbox_consumer.out.log
+python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
+python3 scripts/outbox.py list --limit 20
+python3 scripts/outbox_consumer.py dry-run --limit 10
+python3 scripts/flight_auto_enhancer.py run
 python3 -m unittest tests.test_flight_parser
 ```
+
+See [docs/v2-beta-acceptance.md](docs/v2-beta-acceptance.md) for the full
+dry-run acceptance checklist and rollback commands.
 ## Current Status
 
 Stable from 1.0:
@@ -390,7 +407,7 @@ Stable from 1.0:
 - Flight location enhancement
 - launchd automatic flight location enhancement
 
-Added through v2.0-beta dry-run readiness:
+Added through v2.0-beta dry-run accepted:
 
 - Natural-language draft parsing
 - Conflict detection

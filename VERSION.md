@@ -1,10 +1,10 @@
 # Apple Calendar Assistant
 
-Current version: `v2.0-beta dry-run readiness`
+Current version: `v2.0-beta dry-run accepted`
 
 ## v2.0.0-beta
 
-当前状态：`v2.0-beta dry-run readiness`
+当前状态：`v2.0-beta dry-run accepted`
 
 变更记录：
 
@@ -18,6 +18,8 @@ Current version: `v2.0-beta dry-run readiness`
   `pending`、`status`、`mark-dry-run-sent`
 - Phase 15 Hermes Skill 调用规则收口：
   提醒查询、状态查看、dry-run 已处理标记和 outbox 风险边界
+- Phase 19 v2.0-beta dry-run 全链路验收文档收口：
+  launchd 状态、验收命令、dry-run 链路和回滚方法
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

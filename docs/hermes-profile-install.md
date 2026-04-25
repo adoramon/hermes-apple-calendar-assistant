@@ -1,7 +1,7 @@
 # Hermes Profile Install
 
 本文说明如何把 `hermes-apple-calendar-assistant` 接入
-`sunny-wechat-lite` Hermes profile。当前 v2.0-beta 仍是本地 dry-run 阶段：
+`sunny-wechat-lite` Hermes profile。当前状态是 `v2.0-beta dry-run accepted`：
 提醒 outbox 不真实发送微信、Telegram，也不访问外部网络。
 
 ## 推荐安装路径
@@ -228,6 +228,26 @@ tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbo
 
 ```bash
 python3 scripts/hermes_outbox_cli.py pending --limit 10
+```
+
+如果 `outbox_consumer` launchd 已启用，pending 可能很快被自动消费并变成
+`sent_dry_run`，因此 Hermes 查询 pending outbox 时可能为空。这不代表真实发送
+完成，只代表本地 dry-run consumer 已处理。
+
+## 验收与回滚
+
+完整验收清单见：
+
+```text
+docs/v2-beta-acceptance.md
+```
+
+如需回滚 dry-run outbox 链路，建议只卸载 reminder worker 和 outbox consumer，
+保留 flight auto enhancer：
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
 ```
 
 ## launchd 可选项
