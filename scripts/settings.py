@@ -24,11 +24,18 @@ DEFAULT_REMINDER_SCAN_MINUTES = 180
 DEFAULT_REMINDER_OFFSETS_MINUTES = (15, 60)
 DEFAULT_OUTBOX_SETTINGS = {
     "send_mode": "dry_run",
+    "send_modes_supported": ["dry_run"],
+    "real_send_enabled": False,
     "sender": "channel_sender",
     "allowed_channels": ["hermes"],
     "default_channel": "hermes",
     "default_recipient": "default",
     "max_messages_per_run": 10,
+    "hermes_channel": {
+        "enabled": False,
+        "transport": "local_cli",
+        "notes": "reserved for future real Hermes dispatch",
+    },
 }
 
 
@@ -125,6 +132,12 @@ def get_outbox_settings() -> dict[str, Any]:
         "send_mode": raw.get("send_mode")
         if isinstance(raw.get("send_mode"), str) and raw.get("send_mode")
         else DEFAULT_OUTBOX_SETTINGS["send_mode"],
+        "send_modes_supported": _string_list(
+            raw.get("send_modes_supported"), tuple(DEFAULT_OUTBOX_SETTINGS["send_modes_supported"])
+        ),
+        "real_send_enabled": raw.get("real_send_enabled")
+        if isinstance(raw.get("real_send_enabled"), bool)
+        else DEFAULT_OUTBOX_SETTINGS["real_send_enabled"],
         "sender": raw.get("sender")
         if isinstance(raw.get("sender"), str) and raw.get("sender")
         else DEFAULT_OUTBOX_SETTINGS["sender"],
@@ -138,12 +151,25 @@ def get_outbox_settings() -> dict[str, Any]:
         "max_messages_per_run": raw.get("max_messages_per_run")
         if isinstance(raw.get("max_messages_per_run"), int) and raw.get("max_messages_per_run") > 0
         else DEFAULT_OUTBOX_SETTINGS["max_messages_per_run"],
+        "hermes_channel": raw.get("hermes_channel")
+        if isinstance(raw.get("hermes_channel"), dict)
+        else dict(DEFAULT_OUTBOX_SETTINGS["hermes_channel"]),
     }
 
 
 def get_outbox_send_mode() -> str:
     """Return the configured outbox send mode."""
     return str(get_outbox_settings()["send_mode"])
+
+
+def get_outbox_real_send_enabled() -> bool:
+    """Return whether real outbox sending is enabled."""
+    return bool(get_outbox_settings()["real_send_enabled"])
+
+
+def get_outbox_send_modes_supported() -> list[str]:
+    """Return outbox send modes supported by this installation."""
+    return list(get_outbox_settings()["send_modes_supported"])
 
 
 def get_outbox_sender() -> str:
@@ -169,3 +195,11 @@ def get_outbox_default_recipient() -> str:
 def get_outbox_max_messages_per_run() -> int:
     """Return the maximum outbox messages a consumer may process per run."""
     return int(get_outbox_settings()["max_messages_per_run"])
+
+
+def get_hermes_channel_settings() -> dict[str, Any]:
+    """Return reserved Hermes channel settings for future real dispatch."""
+    value = get_outbox_settings()["hermes_channel"]
+    if isinstance(value, dict):
+        return dict(value)
+    return dict(DEFAULT_OUTBOX_SETTINGS["hermes_channel"])

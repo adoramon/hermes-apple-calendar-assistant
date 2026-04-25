@@ -26,13 +26,22 @@
   ],
   "outbox": {
     "send_mode": "dry_run",
+    "send_modes_supported": [
+      "dry_run"
+    ],
+    "real_send_enabled": false,
     "sender": "channel_sender",
     "allowed_channels": [
       "hermes"
     ],
     "default_channel": "hermes",
     "default_recipient": "default",
-    "max_messages_per_run": 10
+    "max_messages_per_run": 10,
+    "hermes_channel": {
+      "enabled": false,
+      "transport": "local_cli",
+      "notes": "reserved for future real Hermes dispatch"
+    }
   },
   "confirmation_required": true
 }

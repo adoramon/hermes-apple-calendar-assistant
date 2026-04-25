@@ -9,12 +9,14 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    from . import util
+    from . import settings, util
 except ImportError:  # Allows importing as: python3 scripts/channel_sender.py
+    import settings  # type: ignore
     import util  # type: ignore
 
 
 DRY_RUN_MODE = "dry_run"
+REAL_MODE = "real"
 SUPPORTED_CHANNELS = {"hermes"}
 
 
@@ -61,9 +63,13 @@ def dry_run_send(message: dict[str, Any]) -> dict[str, Any]:
 def send_message(message: dict[str, Any], mode: str) -> dict[str, Any]:
     """Send one outbound message using the configured mode.
 
-    Only dry_run is implemented. Any other mode is explicitly rejected so future
-    real send work cannot accidentally route through this abstraction.
+    Only dry_run is implemented. The real branch is reserved and always rejected
+    in this phase, even when the safety placeholder is enabled.
     """
-    if mode != DRY_RUN_MODE:
+    if mode == DRY_RUN_MODE:
+        return dry_run_send(message)
+    if mode == REAL_MODE:
+        if not settings.get_outbox_real_send_enabled():
+            return _json_error("real send is not implemented")
         return _json_error("real send is not implemented")
-    return dry_run_send(message)
+    return _json_error("unsupported send mode")

@@ -179,11 +179,18 @@ Outbox safety switches live in `config/settings.json`:
 {
   "outbox": {
     "send_mode": "dry_run",
+    "send_modes_supported": ["dry_run"],
+    "real_send_enabled": false,
     "sender": "channel_sender",
     "allowed_channels": ["hermes"],
     "default_channel": "hermes",
     "default_recipient": "default",
-    "max_messages_per_run": 10
+    "max_messages_per_run": 10,
+    "hermes_channel": {
+      "enabled": false,
+      "transport": "local_cli",
+      "notes": "reserved for future real Hermes dispatch"
+    }
   }
 }
 ```
@@ -192,7 +199,7 @@ Outbox safety switches live in `config/settings.json`:
 returns `ok=false` because real sending is not implemented yet. The consumer also
 skips channels outside `allowed_channels`, and caps each run by
 `max_messages_per_run`. See [docs/channel-sender.md](docs/channel-sender.md) for
-the pre-real-send channel sender abstraction.
+the pre-real-send channel sender abstraction and reserved Hermes channel design.
 
 Scan flight events:
 
