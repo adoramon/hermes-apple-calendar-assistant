@@ -300,6 +300,25 @@ The outbox consumer launchd task runs every 1 minute and calls:
 python3 scripts/outbox_consumer.py dry-run --limit 10
 ```
 
+This launchd task only performs dry-run consumption: it reads pending records from
+`data/outbox_messages.jsonl` and marks them as `sent_dry_run`. It does not send
+WeChat, Telegram, Hermes push, or any external network message. `sent_dry_run`
+means “consumed by the local dry-run consumer”, not “actually delivered”.
+
+Uninstall:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
+rm ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
+```
+
+Logs:
+
+```bash
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.out.log
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.err.log
+```
+
 Current dry-run reminder flow:
 
 ```text
@@ -307,8 +326,8 @@ Calendar.app
   -> reminder_worker.py scan --format outbound --write-outbox
   -> message_adapter.py
   -> data/outbox_messages.jsonl
-  -> hermes_outbox_cli.py pending/status/mark-dry-run-sent
-  -> Hermes 展示 / 用户确认
+  -> outbox_consumer.py dry-run --limit 10
+  -> status: sent_dry_run
 ```
 
 This flow still does not send Telegram, WeChat, or external network requests.
@@ -317,7 +336,12 @@ per-run message limits before any future real sender is added.
 See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
 uninstall, status, log, and manual trigger instructions.
 See [docs/hermes-outbox-cli.md](docs/hermes-outbox-cli.md) for the Hermes-facing
-local pending/status/mark interface.
+local pending/status/mark interface. Hermes can also inspect pending outbox
+before consumer dry-run processing with:
+
+```bash
+python3 scripts/hermes_outbox_cli.py pending --limit 10
+```
 
 v2.0-beta 当前链路：
 
@@ -328,6 +352,16 @@ reminder_worker
   ↓
 message_adapter
   ↓
+outbox_messages.jsonl
+  ↓
+outbox_consumer dry-run
+  ↓
+sent_dry_run
+```
+
+Hermes inspection path:
+
+```text
 outbox_messages.jsonl
   ↓
 hermes_outbox_cli

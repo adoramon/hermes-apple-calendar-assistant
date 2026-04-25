@@ -5,6 +5,23 @@
 状态更新为 `sent_dry_run`。
 
 当前阶段不发送真实消息，不调用 Telegram、微信或任何外部网络。
+`sent_dry_run` 只表示该 outbox 记录已经被本地 dry-run consumer 消费，不代表
+真实消息已经发送给用户。
+
+## 完整 dry-run 链路
+
+```text
+Calendar.app
+  -> reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
+  -> message_adapter.py
+  -> data/outbox_messages.jsonl
+  -> outbox_consumer.py dry-run --limit 10
+  -> status: sent_dry_run
+```
+
+这条链路可以通过 launchd 后台启用，但仍然只是本地 dry-run：`reminder_worker`
+写入 outbox，`outbox_consumer` 消费 pending 记录并标记 `sent_dry_run`，不真实
+发送微信、Telegram 或外部网络消息。
 
 ## 安全开关
 
@@ -93,6 +110,9 @@ launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-
 /usr/bin/python3 scripts/outbox_consumer.py dry-run --limit 10
 ```
 
+该 launchd 只执行 dry-run 消费：读取 `data/outbox_messages.jsonl` 中的
+`pending` 记录，写回 `sent_dry_run` 状态，不发送真实消息。
+
 ## 卸载 launchd
 
 ```bash
@@ -115,6 +135,9 @@ tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbo
 tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.err.log
 ```
 
+日志中看到 `sent_dry_run` 只表示本地 dry-run 消费完成，不代表 Telegram、微信或
+Hermes 真实发送完成。
+
 ## 手动触发一次
 
 ```bash
@@ -133,6 +156,7 @@ python3 scripts/outbox_consumer.py dry-run --limit 10
 - 不发送微信
 - 不接外部网络
 - 不写 Apple Calendar
+- `sent_dry_run` 不代表真实发送
 - 非 `dry_run` 模式直接失败
 - 只处理 `allowed_channels` 白名单内的消息
 - 只更新本地 outbox 记录状态
