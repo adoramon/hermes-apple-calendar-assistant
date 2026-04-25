@@ -18,6 +18,7 @@ v2.0-beta dry-run accepted 已支持：
 - outbox dry-run 队列与 dry-run consumer
 - outbox 真实发送前安全开关：`send_mode`、`allowed_channels`、
   `max_messages_per_run`
+- 真实发送前 channel sender 抽象：当前仅支持 `dry_run` + `hermes`
 - Hermes 本地 outbox 读取接口：`pending`、`status`、`mark-dry-run-sent`
 - `飞行计划` location 自动增强 launchd 后台任务
 
@@ -178,6 +179,7 @@ Outbox safety switches live in `config/settings.json`:
 {
   "outbox": {
     "send_mode": "dry_run",
+    "sender": "channel_sender",
     "allowed_channels": ["hermes"],
     "default_channel": "hermes",
     "default_recipient": "default",
@@ -189,7 +191,8 @@ Outbox safety switches live in `config/settings.json`:
 `send_mode` must remain `dry_run` in the current beta line. Any other value
 returns `ok=false` because real sending is not implemented yet. The consumer also
 skips channels outside `allowed_channels`, and caps each run by
-`max_messages_per_run`.
+`max_messages_per_run`. See [docs/channel-sender.md](docs/channel-sender.md) for
+the pre-real-send channel sender abstraction.
 
 Scan flight events:
 
@@ -330,6 +333,7 @@ Calendar.app
   -> reminder_worker.py scan --format outbound --write-outbox
   -> message_adapter.py
   -> data/outbox_messages.jsonl
+  -> channel_sender.py dry_run
   -> outbox_consumer.py dry-run --limit 10
   -> status: sent_dry_run
 ```

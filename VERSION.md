@@ -20,6 +20,8 @@ Current version: `v2.0-beta dry-run accepted`
   提醒查询、状态查看、dry-run 已处理标记和 outbox 风险边界
 - Phase 19 v2.0-beta dry-run 全链路验收文档收口：
   launchd 状态、验收命令、dry-run 链路和回滚方法
+- Phase 20 v2.0-rc 真实发送前通道适配设计：
+  `channel_sender.py`，当前仅支持 `dry_run` + `hermes`
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

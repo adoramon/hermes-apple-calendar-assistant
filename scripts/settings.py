@@ -24,6 +24,7 @@ DEFAULT_REMINDER_SCAN_MINUTES = 180
 DEFAULT_REMINDER_OFFSETS_MINUTES = (15, 60)
 DEFAULT_OUTBOX_SETTINGS = {
     "send_mode": "dry_run",
+    "sender": "channel_sender",
     "allowed_channels": ["hermes"],
     "default_channel": "hermes",
     "default_recipient": "default",
@@ -124,6 +125,9 @@ def get_outbox_settings() -> dict[str, Any]:
         "send_mode": raw.get("send_mode")
         if isinstance(raw.get("send_mode"), str) and raw.get("send_mode")
         else DEFAULT_OUTBOX_SETTINGS["send_mode"],
+        "sender": raw.get("sender")
+        if isinstance(raw.get("sender"), str) and raw.get("sender")
+        else DEFAULT_OUTBOX_SETTINGS["sender"],
         "allowed_channels": _string_list(raw.get("allowed_channels"), tuple(DEFAULT_OUTBOX_SETTINGS["allowed_channels"])),
         "default_channel": raw.get("default_channel")
         if isinstance(raw.get("default_channel"), str) and raw.get("default_channel")
@@ -140,6 +144,11 @@ def get_outbox_settings() -> dict[str, Any]:
 def get_outbox_send_mode() -> str:
     """Return the configured outbox send mode."""
     return str(get_outbox_settings()["send_mode"])
+
+
+def get_outbox_sender() -> str:
+    """Return the configured outbox sender abstraction name."""
+    return str(get_outbox_settings()["sender"])
 
 
 def get_outbox_allowed_channels() -> list[str]:

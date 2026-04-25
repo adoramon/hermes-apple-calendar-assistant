@@ -8,8 +8,9 @@ import sys
 from typing import Any
 
 try:
-    from . import outbox, settings, util
+    from . import channel_sender, outbox, settings, util
 except ImportError:  # Allows running as: python3 scripts/outbox_consumer.py ...
+    import channel_sender  # type: ignore
     import outbox  # type: ignore
     import settings  # type: ignore
     import util  # type: ignore
@@ -26,11 +27,23 @@ def _message_field(record: dict[str, Any], field: str) -> Any:
     return message.get(field, "")
 
 
+def _record_message(record: dict[str, Any]) -> dict[str, Any]:
+    """Return a record's nested outbound message."""
+    message = record.get("message")
+    if isinstance(message, dict):
+        return message
+    return {}
+
+
 def dry_run(limit: int = 10) -> dict[str, Any]:
     """Simulate consuming pending outbox records without sending messages."""
     send_mode = settings.get_outbox_send_mode()
     if send_mode != "dry_run":
-        return util.json_error(f"real sending is not implemented for outbox send_mode={send_mode}")
+        return {"ok": False, "data": None, "error": "real send is not implemented"}
+
+    sender = settings.get_outbox_sender()
+    if sender != "channel_sender":
+        return {"ok": False, "data": None, "error": "unsupported sender"}
 
     allowed_channels = set(settings.get_outbox_allowed_channels())
     max_messages = settings.get_outbox_max_messages_per_run()
@@ -39,8 +52,9 @@ def dry_run(limit: int = 10) -> dict[str, Any]:
     skipped = []
     for record in outbox.get_pending_outbox(effective_limit):
         record_id = record.get("id", "")
-        channel = _message_field(record, "channel")
-        recipient = _message_field(record, "recipient")
+        message = _record_message(record)
+        channel = message.get("channel", "")
+        recipient = message.get("recipient", "")
         if channel not in allowed_channels:
             skipped.append(
                 {
@@ -51,12 +65,24 @@ def dry_run(limit: int = 10) -> dict[str, Any]:
                 }
             )
             continue
+        send_result = channel_sender.send_message(message, send_mode)
+        if not send_result["ok"]:
+            skipped.append(
+                {
+                    "id": record_id,
+                    "channel": channel,
+                    "recipient": recipient,
+                    "reason": send_result["error"],
+                }
+            )
+            continue
         update_result = outbox.update_outbox_status(
             record_id,
             DRY_RUN_STATUS,
             result={
-                "mode": "dry_run",
-                "processed_at": util.now_local_iso(),
+                "mode": send_result["data"]["mode"],
+                "processed_at": send_result["data"]["processed_at"],
+                "sender": "channel_sender",
             },
         )
         if not update_result["ok"]:
@@ -74,6 +100,7 @@ def dry_run(limit: int = 10) -> dict[str, Any]:
     return util.json_ok(
         {
             "send_mode": send_mode,
+            "sender": sender,
             "limit": effective_limit,
             "max_messages_per_run": max_messages,
             "processed": processed,

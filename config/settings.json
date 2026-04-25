@@ -26,6 +26,7 @@
   ],
   "outbox": {
     "send_mode": "dry_run",
+    "sender": "channel_sender",
     "allowed_channels": [
       "hermes"
     ],
