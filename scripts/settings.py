@@ -22,6 +22,13 @@ DEFAULT_EVENT_DURATION_MINUTES = 60
 DEFAULT_CONFLICT_CHECK_WINDOW_DAYS = 30
 DEFAULT_REMINDER_SCAN_MINUTES = 180
 DEFAULT_REMINDER_OFFSETS_MINUTES = (15, 60)
+DEFAULT_OUTBOX_SETTINGS = {
+    "send_mode": "dry_run",
+    "allowed_channels": ["hermes"],
+    "default_channel": "hermes",
+    "default_recipient": "default",
+    "max_messages_per_run": 10,
+}
 
 
 def load_settings() -> dict[str, Any]:
@@ -105,3 +112,51 @@ def get_reminder_default_offsets_minutes() -> list[int]:
         return list(DEFAULT_REMINDER_OFFSETS_MINUTES)
     offsets = sorted({item for item in value if isinstance(item, int) and item > 0})
     return offsets or list(DEFAULT_REMINDER_OFFSETS_MINUTES)
+
+
+def get_outbox_settings() -> dict[str, Any]:
+    """Return normalized outbox settings for dry-run message consumption."""
+    current_settings = load_settings()
+    raw = current_settings.get("outbox")
+    if not isinstance(raw, dict):
+        raw = {}
+    return {
+        "send_mode": raw.get("send_mode")
+        if isinstance(raw.get("send_mode"), str) and raw.get("send_mode")
+        else DEFAULT_OUTBOX_SETTINGS["send_mode"],
+        "allowed_channels": _string_list(raw.get("allowed_channels"), tuple(DEFAULT_OUTBOX_SETTINGS["allowed_channels"])),
+        "default_channel": raw.get("default_channel")
+        if isinstance(raw.get("default_channel"), str) and raw.get("default_channel")
+        else DEFAULT_OUTBOX_SETTINGS["default_channel"],
+        "default_recipient": raw.get("default_recipient")
+        if isinstance(raw.get("default_recipient"), str) and raw.get("default_recipient")
+        else DEFAULT_OUTBOX_SETTINGS["default_recipient"],
+        "max_messages_per_run": raw.get("max_messages_per_run")
+        if isinstance(raw.get("max_messages_per_run"), int) and raw.get("max_messages_per_run") > 0
+        else DEFAULT_OUTBOX_SETTINGS["max_messages_per_run"],
+    }
+
+
+def get_outbox_send_mode() -> str:
+    """Return the configured outbox send mode."""
+    return str(get_outbox_settings()["send_mode"])
+
+
+def get_outbox_allowed_channels() -> list[str]:
+    """Return outbound channels allowed for outbox consumption."""
+    return list(get_outbox_settings()["allowed_channels"])
+
+
+def get_outbox_default_channel() -> str:
+    """Return the default outbound channel for future sender integrations."""
+    return str(get_outbox_settings()["default_channel"])
+
+
+def get_outbox_default_recipient() -> str:
+    """Return the default outbound recipient for future sender integrations."""
+    return str(get_outbox_settings()["default_recipient"])
+
+
+def get_outbox_max_messages_per_run() -> int:
+    """Return the maximum outbox messages a consumer may process per run."""
+    return int(get_outbox_settings()["max_messages_per_run"])

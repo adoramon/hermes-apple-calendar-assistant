@@ -6,6 +6,27 @@
 
 当前阶段不发送真实消息，不调用 Telegram、微信或任何外部网络。
 
+## 安全开关
+
+outbox consumer 启动时会读取 `config/settings.json` 中的 `outbox` 配置：
+
+```json
+{
+  "outbox": {
+    "send_mode": "dry_run",
+    "allowed_channels": ["hermes"],
+    "default_channel": "hermes",
+    "default_recipient": "default",
+    "max_messages_per_run": 10
+  }
+}
+```
+
+- `send_mode`：当前只支持 `dry_run`。如果配置成其他值，本阶段会返回
+  `ok=false`，提示真实发送尚未实现。
+- `allowed_channels`：只处理白名单内的 channel。非白名单消息会被跳过，不改状态。
+- `max_messages_per_run`：每次最多处理的消息数，CLI `--limit` 不能超过这个上限。
+
 ## 查看 pending
 
 先查看最近 outbox 记录：
@@ -29,6 +50,9 @@ python3 scripts/outbox_consumer.py dry-run --limit 10
 {
   "ok": true,
   "data": {
+    "send_mode": "dry_run",
+    "limit": 10,
+    "max_messages_per_run": 10,
     "processed": [
       {
         "id": "sha1...",
@@ -109,6 +133,8 @@ python3 scripts/outbox_consumer.py dry-run --limit 10
 - 不发送微信
 - 不接外部网络
 - 不写 Apple Calendar
+- 非 `dry_run` 模式直接失败
+- 只处理 `allowed_channels` 白名单内的消息
 - 只更新本地 outbox 记录状态
 
 ## 后续接入方向

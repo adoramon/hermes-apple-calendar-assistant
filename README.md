@@ -15,6 +15,9 @@ v2.0-alpha 已支持：
 - 单日历冲突检测与建议时间段
 - 提醒候选扫描：只输出 JSON，不主动发送消息
 - reminder worker launchd 模板
+- outbox dry-run 队列与 dry-run consumer
+- outbox 真实发送前安全开关：`send_mode`、`allowed_channels`、
+  `max_messages_per_run`
 - `飞行计划` location 自动增强 launchd 后台任务
 
 v2.0-alpha excludes:
@@ -152,6 +155,25 @@ Dry-run consume pending outbox messages:
 python3 scripts/outbox_consumer.py dry-run --limit 10
 ```
 
+Outbox safety switches live in `config/settings.json`:
+
+```json
+{
+  "outbox": {
+    "send_mode": "dry_run",
+    "allowed_channels": ["hermes"],
+    "default_channel": "hermes",
+    "default_recipient": "default",
+    "max_messages_per_run": 10
+  }
+}
+```
+
+`send_mode` must remain `dry_run` in the current beta line. Any other value
+returns `ok=false` because real sending is not implemented yet. The consumer also
+skips channels outside `allowed_channels`, and caps each run by
+`max_messages_per_run`.
+
 Scan flight events:
 
 ```bash
@@ -244,6 +266,8 @@ Calendar.app
 ```
 
 This flow still does not send Telegram, WeChat, or external network requests.
+The outbox consumer is guarded by `send_mode=dry_run`, channel allow-listing, and
+per-run message limits before any future real sender is added.
 See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
 uninstall, status, log, and manual trigger instructions.
 

@@ -24,5 +24,14 @@
     15,
     60
   ],
+  "outbox": {
+    "send_mode": "dry_run",
+    "allowed_channels": [
+      "hermes"
+    ],
+    "default_channel": "hermes",
+    "default_recipient": "default",
+    "max_messages_per_run": 10
+  },
   "confirmation_required": true
 }

@@ -1,6 +1,18 @@
 # Apple Calendar Assistant
 
-Current version: `v2.0-alpha`
+Current version: `v2.0-beta`
+
+## v2.0.0-beta
+
+变更记录：
+
+- outbound reminder message adapter
+- dry-run outbox queue: `data/outbox_messages.jsonl`
+- dry-run outbox consumer
+- outbox consumer launchd template
+- Phase 13 安全开关与配置收口：
+  `outbox.send_mode=dry_run`、`allowed_channels`、`max_messages_per_run`
+- 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha
 
