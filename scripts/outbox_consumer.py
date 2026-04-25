@@ -83,6 +83,7 @@ def dry_run(limit: int = 10) -> dict[str, Any]:
                 "mode": send_result["data"]["mode"],
                 "processed_at": send_result["data"]["processed_at"],
                 "sender": "channel_sender",
+                "dispatcher": send_result["data"].get("dispatcher", ""),
             },
         )
         if not update_result["ok"]:

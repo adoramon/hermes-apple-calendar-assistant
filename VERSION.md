@@ -1,10 +1,10 @@
 # Apple Calendar Assistant
 
-Current version: `v2.0-beta dry-run accepted`
+Current version: `v2.0-rc local dispatch dry-run`
 
 ## v2.0.0-beta
 
-当前状态：`v2.0-beta dry-run accepted`
+当前状态：`v2.0-rc local dispatch dry-run`
 
 变更记录：
 
@@ -25,6 +25,9 @@ Current version: `v2.0-beta dry-run accepted`
 - Phase 21 v2.0-rc Hermes 通道真实发送方案设计：
   `real_send_enabled=false`、`send_modes_supported=["dry_run"]`、
   `hermes_channel` 保留配置
+- Phase 22-24 v2.0-rc 本机 Hermes 调度闭环准备：
+  `hermes_dispatcher.py`、`channel_sender -> hermes_dispatcher` dry-run、
+  本机闭环验收文档
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

@@ -2,11 +2,11 @@
 
 Apple Calendar Assistant 是一个 macOS-only Hermes custom skill，用于在
 `sunny-wechat-lite` profile 中操作 Calendar.app。当前开发线是
-`v2.0-beta dry-run accepted`。
+`v2.0-rc local dispatch dry-run`。
 
-## v2.0-beta Dry-run Accepted
+## v2.0-rc Local Dispatch Dry-run
 
-v2.0-beta dry-run accepted 已支持：
+v2.0-rc local dispatch dry-run 已支持：
 
 - 明确时间范围后查询 Apple Calendar 日程
 - 确认式创建、修改、删除日程
@@ -19,6 +19,7 @@ v2.0-beta dry-run accepted 已支持：
 - outbox 真实发送前安全开关：`send_mode`、`allowed_channels`、
   `max_messages_per_run`
 - 真实发送前 channel sender 抽象：当前仅支持 `dry_run` + `hermes`
+- Hermes 本机 dispatch dry-run 占位：`scripts/hermes_dispatcher.py`
 - Hermes 本地 outbox 读取接口：`pending`、`status`、`mark-dry-run-sent`
 - `飞行计划` location 自动增强 launchd 后台任务
 
@@ -340,8 +341,9 @@ Calendar.app
   -> reminder_worker.py scan --format outbound --write-outbox
   -> message_adapter.py
   -> data/outbox_messages.jsonl
-  -> channel_sender.py dry_run
   -> outbox_consumer.py dry-run --limit 10
+  -> channel_sender.py dry_run
+  -> hermes_dispatcher.py dry-run
   -> status: sent_dry_run
 ```
 
@@ -373,6 +375,10 @@ message_adapter
 outbox_messages.jsonl
   ↓
 outbox_consumer dry-run
+  ↓
+channel_sender
+  ↓
+hermes_dispatcher dry-run
   ↓
 sent_dry_run
 ```
@@ -408,6 +414,8 @@ python3 -m unittest tests.test_flight_parser
 
 See [docs/v2-beta-acceptance.md](docs/v2-beta-acceptance.md) for the full
 dry-run acceptance checklist and rollback commands.
+See [docs/v2-rc-local-dispatch-acceptance.md](docs/v2-rc-local-dispatch-acceptance.md)
+for the local dispatch dry-run acceptance checklist.
 ## Current Status
 
 Stable from 1.0:

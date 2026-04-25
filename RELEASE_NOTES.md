@@ -1,5 +1,23 @@
 # Release Notes
 
+## v2.0-rc Local Dispatch Dry-run
+
+当前状态是 `v2.0-rc local dispatch dry-run`。本阶段新增 Hermes 本机 dispatch
+占位接口，并把 dry-run 链路收口为：
+
+```text
+Apple Calendar
+  -> reminder_worker
+  -> message_adapter
+  -> outbox_messages.jsonl
+  -> outbox_consumer
+  -> channel_sender
+  -> hermes_dispatcher dry-run
+  -> sent_dry_run
+```
+
+仍不真实发送微信、Telegram 或任何外部网络消息。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

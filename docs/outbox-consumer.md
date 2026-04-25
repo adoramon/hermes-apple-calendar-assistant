@@ -16,12 +16,15 @@ Calendar.app
   -> message_adapter.py
   -> data/outbox_messages.jsonl
   -> outbox_consumer.py dry-run --limit 10
+  -> channel_sender.py
+  -> hermes_dispatcher.py dry-run
   -> status: sent_dry_run
 ```
 
 这条链路可以通过 launchd 后台启用，但仍然只是本地 dry-run：`reminder_worker`
-写入 outbox，`outbox_consumer` 消费 pending 记录并标记 `sent_dry_run`，不真实
-发送微信、Telegram 或外部网络消息。
+写入 outbox，`outbox_consumer` 通过 `channel_sender` 和 `hermes_dispatcher`
+消费 pending 记录并标记 `sent_dry_run`，不真实发送微信、Telegram 或外部网络
+消息。
 
 ## 安全开关
 

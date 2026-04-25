@@ -228,7 +228,10 @@ Outbox 安全边界：
 - 当前阶段不真实发送微信。
 - 当前阶段不真实发送 Telegram。
 - 当前阶段 outbox 只是本地 dry-run 队列。
+- Hermes 当前可以读取 pending outbox。
+- Hermes 可以在用户明确确认后请求 dry-run 标记。
 - Hermes 不应调用任何外部网络发送接口。
+- Hermes 不应调用任何真实发送接口。
 - Hermes 不得删除 outbox 记录。
 - Hermes 不得修改 message 内容。
 - Hermes 只能读取 pending、查看 status、把 pending 标记为 `sent_dry_run`。

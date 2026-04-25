@@ -51,10 +51,25 @@ dry-run，再把 outbox 记录标记为 `sent_dry_run`。
 outbox_consumer
   -> channel_sender.send_message(mode=dry_run)
   -> dry_run_send
+  -> hermes_dispatcher.dry_run_dispatch_message
   -> outbox status: sent_dry_run
 ```
 
 `sent_dry_run` 只表示本地 dry-run 消费完成，不代表真实发送完成。
+
+## Hermes dispatcher 集成
+
+`channel_sender.py` 在 `mode=dry_run` 且 `channel=hermes` 时，会调用
+`hermes_dispatcher.dry_run_dispatch_message(message)`。这不是 CLI subprocess，也不
+发网络请求，只构造本地 Hermes dry-run payload。
+
+CLI 级别可使用：
+
+```bash
+python3 scripts/hermes_dispatcher.py dry-run --id "<outbox_record_id>"
+```
+
+该命令只处理 `pending` outbox record，并将其标记为 `sent_dry_run`。
 
 ## 配置
 

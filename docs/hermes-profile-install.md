@@ -1,7 +1,7 @@
 # Hermes Profile Install
 
 本文说明如何把 `hermes-apple-calendar-assistant` 接入
-`sunny-wechat-lite` Hermes profile。当前状态是 `v2.0-beta dry-run accepted`：
+`sunny-wechat-lite` Hermes profile。当前状态是 `v2.0-rc local dispatch dry-run`：
 提醒 outbox 不真实发送微信、Telegram，也不访问外部网络。
 
 ## 推荐安装路径
@@ -196,6 +196,8 @@ Calendar.app
   -> message_adapter.py
   -> data/outbox_messages.jsonl
   -> outbox_consumer.py dry-run --limit 10
+  -> channel_sender.py
+  -> hermes_dispatcher.py dry-run
   -> status: sent_dry_run
 ```
 
@@ -239,7 +241,7 @@ python3 scripts/hermes_outbox_cli.py pending --limit 10
 完整验收清单见：
 
 ```text
-docs/v2-beta-acceptance.md
+docs/v2-rc-local-dispatch-acceptance.md
 ```
 
 如需回滚 dry-run outbox 链路，建议只卸载 reminder worker 和 outbox consumer，

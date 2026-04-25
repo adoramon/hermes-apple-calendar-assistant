@@ -9,8 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    from . import settings, util
+    from . import hermes_dispatcher, settings, util
 except ImportError:  # Allows importing as: python3 scripts/channel_sender.py
+    import hermes_dispatcher  # type: ignore
     import settings  # type: ignore
     import util  # type: ignore
 
@@ -49,6 +50,20 @@ def dry_run_send(message: dict[str, Any]) -> dict[str, Any]:
     recipient_result = validate_recipient(message)
     if not recipient_result["ok"]:
         return recipient_result
+    if message.get("channel") == "hermes":
+        dispatch_result = hermes_dispatcher.dry_run_dispatch_message(message)
+        if not dispatch_result["ok"]:
+            return dispatch_result
+        return util.json_ok(
+            {
+                "mode": DRY_RUN_MODE,
+                "status": dispatch_result["data"]["status"],
+                "channel": message.get("channel", ""),
+                "recipient": message.get("recipient", ""),
+                "processed_at": dispatch_result["data"]["processed_at"],
+                "dispatcher": "hermes_dispatcher",
+            }
+        )
     return util.json_ok(
         {
             "mode": DRY_RUN_MODE,
