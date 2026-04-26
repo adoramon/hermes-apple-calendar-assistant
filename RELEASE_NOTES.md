@@ -278,6 +278,26 @@ Apple Calendar
   创建/修改/删除成功只能基于脚本 `ok=true`；
   禁止编造 Apple Reminders 同步结果。
 
+### Phase 43 Hotel Order Recognition And Calendar Drafts
+
+- 新增 `scripts/hotel_order_parser.py`：
+  规则解析酒店订单文字，识别酒店名称、地址、入住/离店日期、入住/离店时间、入住
+  人、房型、订单号/确认号、平台来源和置信度。
+- 新增 `scripts/hotel_order_flow.py`：
+  `draft` 生成酒店行程待确认草稿；
+  `update-draft` 补充 `calendar` / `checkin-time`；
+  `confirm` 在信息完整并确认后写入 Apple Calendar；
+  `cancel` 取消 pending 草稿。
+- 新增文档：`docs/hotel-order-flow.md`。
+- 安全边界：
+  不直接写日历；
+  只允许用户选择 `个人计划` / `夫妻计划`；
+  必须确认具体入住时间；
+  不写 `飞行计划`、不创建提醒事项、不操作 Apple Reminders、不请求外部网络、不实现 OCR。
+- 截图场景：
+  如果 Hermes 已提取 OCR 文本，则把文字传给 hotel order flow；
+  如果没有文字内容，应请用户提供订单文字或先进行截图文字读取。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

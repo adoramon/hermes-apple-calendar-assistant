@@ -260,3 +260,44 @@ def format_error_friendly(error: Any, context: str | None = None) -> str:
         prefix += f"（{context}）"
     text = clean_text(error) or "原因暂时不明确"
     return f"{prefix}，我先帮您记一下：{text}"
+
+
+def format_hotel_order_draft(order: dict[str, Any], missing_fields: list[str] | None = None) -> str:
+    """Format a hotel order draft without claiming Calendar writes."""
+    missing = set(missing_fields or [])
+    lines = ["高先生，我看这是一条酒店订单，我先帮您整理好了 📅", ""]
+    hotel_name = clean_text(order.get("hotel_name"))
+    if hotel_name:
+        lines.append(f"🏨 酒店：{hotel_name}")
+    address = clean_text(order.get("address"))
+    if address:
+        lines.append(f"📍 地址：{address}")
+    checkin = clean_text(order.get("checkin_date"))
+    if order.get("checkin_time"):
+        checkin = f"{checkin} {clean_text(order.get('checkin_time'))}".strip()
+    if checkin:
+        lines.append(f"🛏️ 入住：{checkin}")
+    checkout = clean_text(order.get("checkout_date"))
+    if order.get("checkout_time"):
+        checkout = f"{checkout} {clean_text(order.get('checkout_time'))}".strip()
+    if checkout:
+        lines.append(f"🚪 离店：{checkout}")
+    guest = clean_text(order.get("guest_name"))
+    if guest:
+        lines.append(f"👤 入住人：{guest}")
+    room_type = clean_text(order.get("room_type"))
+    if room_type:
+        lines.append(f"🛏️ 房型：{room_type}")
+
+    questions = []
+    if "calendar" in missing:
+        questions.append("写入「个人计划」还是「夫妻计划」？")
+    if "checkin_time" in missing:
+        questions.append("入住当天几点记录比较合适？例如 15:00。")
+    if questions:
+        lines.extend(["", "写入前我还需要您确认："])
+        for index, question in enumerate(questions, start=1):
+            lines.append(f"{index}. {question}")
+    else:
+        lines.extend(["", "您确认后我再写入 Apple Calendar。"])
+    return "\n".join(lines)

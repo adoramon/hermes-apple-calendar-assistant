@@ -144,6 +144,13 @@ its core fields and exposes persona text through `data.display_message`. See
 [docs/persona-style.md](docs/persona-style.md) and
 [docs/persona-examples.md](docs/persona-examples.md).
 
+Phase 43 hotel order update: copied hotel order text, or OCR text extracted by
+Hermes from a screenshot, can now be parsed into a Calendar draft. The flow asks
+the user to choose `个人计划` or `夫妻计划`, requires a concrete check-in time, and
+only writes Apple Calendar after explicit confirmation. It does not write
+`飞行计划`, create reminders, operate Apple Reminders, request the network, or
+perform OCR itself. See [docs/hotel-order-flow.md](docs/hotel-order-flow.md).
+
 ## Calendar Policy
 
 Read calendars:

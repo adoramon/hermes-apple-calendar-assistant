@@ -70,6 +70,9 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 42 v2.0-rc 高先生专属 AI 女助理人格系统：
   新增 `scripts/assistant_persona.py` 正式统一人格文案函数，CLI 保留核心 JSON
   字段并增加 `data.display_message`；Hermes 回复优先采用 display_message
+- Phase 43 v2.0-rc 酒店订单识别与行程写入：
+  新增酒店订单规则解析和确认式草稿流程，仅允许写入 `个人计划` / `夫妻计划`，
+  必须确认入住时间，确认后才写入 Apple Calendar
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

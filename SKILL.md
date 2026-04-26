@@ -180,6 +180,49 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/intera
 创建日程永远需要显式确认。`confirm` 使用 pending draft 中的原始时间，除非用户
 要求修改草稿并确认修改后的版本。
 
+## Hotel Order Rules
+
+当用户发送文字或截图，内容明显是酒店订单、酒店预订、民宿订单或住宿确认信息时：
+
+1. 优先调用酒店订单草稿流程：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py draft --text "<订单文字>"
+```
+
+2. 不要直接创建日程。
+3. 必须确认写入日历，只允许：
+
+- `个人计划`
+- `夫妻计划`
+
+4. 必须确认具体入住时间，例如 `15:00`。
+5. 用户补充日历或入住时间后，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py update-draft \
+  --session-key "<session_key>" \
+  --calendar "夫妻计划" \
+  --checkin-time "15:00"
+```
+
+6. 用户明确确认后，才调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py confirm --session-key "<session_key>"
+```
+
+7. 不得写入 `商务计划`、`家庭计划`、`飞行计划`。
+8. 不得创建提醒事项。
+9. 不得写 Apple Reminders。
+10. 如果截图没有 OCR 文本，应回复：
+
+```text
+我需要先看到订单里的文字信息，您可以把截图里的订单文字复制给我，或者让我读取截图文字后再整理。
+```
+
+如果脚本返回 `data.display_message`，Hermes 应优先采用该文案。
+
 ## Update Rules
 
 用户要求修改日程时，先识别：
