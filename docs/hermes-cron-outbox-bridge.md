@@ -60,10 +60,29 @@ python3 scripts/flight_auto_enhancer.py run
 
 ## 如何创建 Hermes cron job
 
+先在 `sunny-wechat-lite` profile 的专属脚本目录安装 bridge wrapper：
+
+```bash
+mkdir -p ~/.hermes/profiles/sunny-wechat-lite/scripts
+cat > ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh <<'SH'
+#!/bin/zsh
+cd /Users/administrator/Code/hermes-apple-calendar-assistant
+python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent
+SH
+chmod +x ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh
+```
+
+注意：不同 Hermes profile 应使用各自的 profile 专属脚本目录，而不是全局
+`~/.hermes/scripts/`。例如这里使用的是：
+
+```bash
+~/.hermes/profiles/sunny-wechat-lite/scripts/
+```
+
 ```bash
 sunny-wechat-lite cron create "every 5m" \
   --name "calendar-outbox-wechat-bridge" \
-  --script "/Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent" \
+  --script "~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh" \
   --deliver "weixin:<chat_id>"
 ```
 

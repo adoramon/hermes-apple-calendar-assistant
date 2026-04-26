@@ -125,7 +125,7 @@ Apple Calendar
   不修改 outbox 状态、不删除 outbox、不读取 token、不请求网络、不直连
   WeChat/Telegram。
 - 文档已记录 Hermes cron 创建模板：
-  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script ".../scripts/hermes_cron_outbox_bridge.py read-pending --limit 5" --deliver "weixin:<chat_id>"`。
+  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script "~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh" --deliver "weixin:<chat_id>"`。
 - 风险已记录：
   如果只读不标记，pending 会重复发送，因此正式启用前必须进入 Phase 32。
 
@@ -147,7 +147,7 @@ Apple Calendar
 - `scripts/outbox.py list --limit 20` 现在可直接展示
   `sent_via_hermes_cron` 状态，并显示 result.note。
 - 文档新增正式启用命令：
-  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script ".../scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent" --deliver "weixin:<chat_id>"`。
+  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script "~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh" --deliver "weixin:<chat_id>"`。
 - 风险已记录：
   bridge 标记发生在 Hermes Cron stdout handoff 后，
   如果后续 Delivery 失败，目前无法自动回滚。
@@ -157,7 +157,10 @@ Apple Calendar
 - 当前正式启用链路已记录：
   `Apple Calendar -> reminder_worker launchd -> outbox_messages.jsonl -> Hermes Cron bridge script -> Hermes Cron Delivery -> Weixin Adapter -> 微信`。
 - 已记录正式启用命令：
-  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script "/Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent" --deliver "weixin:<chat_id>"`。
+  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script "~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh" --deliver "weixin:<chat_id>"`。
+- 已补充说明：`cron --script` 使用的是 profile 专属脚本目录
+  `~/.hermes/profiles/sunny-wechat-lite/scripts/`，不同 profile 应使用各自 profile
+  的 `scripts/` 目录。
 - 已记录为什么需要暂停 `outbox_consumer` dry-run launchd：
   它会把 `pending` 抢先消费为 `sent_dry_run`，导致 Hermes Cron bridge 读不到待发送
   消息。

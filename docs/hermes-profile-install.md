@@ -186,10 +186,31 @@ Cron Delivery 负责，而不是由本项目直接调用外部接口。
 
 正式启用命令：
 
+先创建 `sunny-wechat-lite` profile 的 bridge 脚本：
+
+```bash
+mkdir -p ~/.hermes/profiles/sunny-wechat-lite/scripts
+cat > ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh <<'SH'
+#!/bin/zsh
+cd /Users/administrator/Code/hermes-apple-calendar-assistant
+python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent
+SH
+chmod +x ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh
+```
+
+不同 profile 应使用各自 profile 的 `scripts/` 目录。这里不是全局
+`~/.hermes/scripts/`，而是：
+
+```bash
+~/.hermes/profiles/sunny-wechat-lite/scripts/
+```
+
+然后创建 cron job：
+
 ```bash
 sunny-wechat-lite cron create "every 5m" \
   --name "calendar-outbox-wechat-bridge" \
-  --script "/Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent" \
+  --script "~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh" \
   --deliver "weixin:<chat_id>"
 ```
 

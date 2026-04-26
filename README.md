@@ -84,12 +84,15 @@ APIs directly, and does not modify message content. See
 Phase 33 enablement update: the Hermes Cron Outbox Bridge path is now the
 active delivery path. `reminder_worker` launchd writes pending outbox messages,
 Hermes Cron job `calendar-outbox-wechat-bridge` reads them with
-`--mark-sent --empty-mode silent`, and Hermes Cron Delivery sends them through
-DeliveryRouter and the Weixin adapter. `outbox_consumer` dry-run launchd must
-remain paused so it does not consume pending messages before the Cron bridge can
-deliver them. `sent_via_hermes_cron` means the record was handed to Hermes Cron
-stdout for delivery and should not be sent again by the bridge, but it is not a
-guarantee that downstream delivery succeeded. See
+profile script `~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh`,
+and Hermes Cron Delivery sends them through DeliveryRouter and the Weixin
+adapter. Different profiles should use their own `~/.hermes/profiles/<profile>/scripts/`
+directory rather than a global Hermes scripts directory. `outbox_consumer`
+dry-run launchd must remain paused so it does not consume pending messages
+before the Cron bridge can deliver them. `sent_via_hermes_cron` means the
+record was handed to Hermes Cron stdout for delivery and should not be sent
+again by the bridge, but it is not a guarantee that downstream delivery
+succeeded. See
 [docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md),
 [docs/hermes-profile-install.md](docs/hermes-profile-install.md), and
 [docs/v2-rc-local-dispatch-acceptance.md](docs/v2-rc-local-dispatch-acceptance.md).
