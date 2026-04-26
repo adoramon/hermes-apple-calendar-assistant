@@ -238,6 +238,28 @@ Outbox 安全边界：
 - Hermes 不得修改 message 内容。
 - Hermes 只能读取 pending、查看 status、把 pending 标记为 `sent_dry_run`。
 
+## Hermes Cron Outbox Bridge
+
+当前仓库包含 Hermes Cron Outbox Bridge：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5
+```
+
+用途：
+
+- 供 Hermes cron `--script` 读取 `pending` outbox
+- 输出适合 Hermes Cron Delivery 的纯文本
+- 当前只读，不标记 sent，不删除 outbox
+
+规则：
+
+- 当前 Hermes 对话仍可读取 pending outbox：
+  `python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_outbox_cli.py pending --limit 10`
+- Cron bridge 当前只读，不应长期启用。
+- 在进入 Phase 32 前，不要把 Cron bridge 当作正式真实发送链路长期运行。
+- 如果 bridge 输出为空，Hermes cron 不应把它解释为发送成功。
+
 ## Flight Location Enhancement
 
 Flight location enhancement has two modes:

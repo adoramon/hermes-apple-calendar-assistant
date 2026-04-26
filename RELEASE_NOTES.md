@@ -107,6 +107,28 @@ Apple Calendar
   `sunny-wechat-lite cron create --script ... --deliver weixin:<chat_id>`
   验证；先保持 dry-run 消费，再评估是否引入 `sent_via_hermes_cron`。
 
+### Phase 31 Hermes Cron Outbox Bridge
+
+- 新增脚本：`scripts/hermes_cron_outbox_bridge.py`。
+- 新增文档：`docs/hermes-cron-outbox-bridge.md`。
+- 新增 CLI：
+  `python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5`。
+- bridge 当前行为：
+  只读取 `data/outbox_messages.jsonl` 中 `status=pending` 的记录，
+  按 `created_at` 升序输出，最多 `limit` 条。
+- 输出为适合 Hermes Cron Delivery 的纯文本，默认使用
+  `--empty-mode silent`，无 pending 时 stdout 为空。
+- 新增 `--empty-mode silent|message`：
+  `silent` 避免无意义通知；
+  `message` 输出 `当前没有待发送日历提醒。`，用于手动验证。
+- 本阶段明确保持只读：
+  不修改 outbox 状态、不删除 outbox、不读取 token、不请求网络、不直连
+  WeChat/Telegram。
+- 文档已记录 Hermes cron 创建模板：
+  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script ".../scripts/hermes_cron_outbox_bridge.py read-pending --limit 5" --deliver "weixin:<chat_id>"`。
+- 风险已记录：
+  如果只读不标记，pending 会重复发送，因此正式启用前必须进入 Phase 32。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

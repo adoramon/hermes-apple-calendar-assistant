@@ -41,6 +41,9 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 30 v2.0-rc Hermes Cron Delivery 真实投递路径验证：
   已验证 `Hermes Cron -> DeliveryRouter -> Weixin Adapter -> 微信` 链路可用，
   但 Calendar Skill 仍不直接读取 token、不直连微信 API
+- Phase 31 v2.0-rc Hermes Cron Outbox Bridge：
+  新增只读 bridge 脚本供 `cron --script` 读取 pending outbox 并输出纯文本，
+  当前不标记 sent，不应长期启用
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

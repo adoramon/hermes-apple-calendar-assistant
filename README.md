@@ -66,6 +66,13 @@ Skill outbox generation plus Hermes Cron `--deliver` inside the Hermes runtime.
 See [docs/hermes-cron-delivery-test.md](docs/hermes-cron-delivery-test.md) and
 [docs/decision-records/ADR-004-hermes-cron-delivery.md](docs/decision-records/ADR-004-hermes-cron-delivery.md).
 
+Phase 31 bridge update: this repository now includes a read-only Hermes Cron
+Outbox Bridge script for `cron --script`, which renders oldest `pending` outbox
+records as plain text without changing outbox status. It is intended for
+validation and integration preparation only; until Phase 32 adds status marking,
+it must not be treated as a long-running real-send workflow. See
+[docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md).
+
 ## Calendar Policy
 
 Read calendars:
