@@ -53,6 +53,8 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 34 v2.0-rc Hermes Cron Bridge 脚本类型修正：
   `cron --script` 应使用 profile/scripts 下的 Python wrapper
   `calendar_outbox_bridge.py`，不能使用 `.sh` shell wrapper
+- Phase 38 v2.0-rc 微信提醒交互式日程秘书：
+  新增提醒后续操作解析、最近提醒上下文读取、确认式操作草稿与确认执行流程
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

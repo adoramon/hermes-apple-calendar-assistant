@@ -238,6 +238,29 @@ Outbox 安全边界：
 - Hermes 不得修改 message 内容。
 - Hermes 只能读取 pending、查看 status、把 pending 标记为 `sent_dry_run`。
 
+## Reminder Follow-up Actions
+
+当用户在收到日历提醒后回复“延后30分钟”“延后1小时”“取消这个日程”“改到明天上午10点”“已到达”“不再提醒”“提前30分钟提醒我”等后续操作时，先调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/reminder_action_flow.py draft --text "<用户原文>"
+```
+
+Hermes 必须展示返回的草稿摘要和目标日程。只有用户明确确认后，才调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/reminder_action_flow.py confirm --session-key "<session_key>"
+```
+
+规则：
+
+- draft 阶段绝不修改 Calendar。
+- 删除和改期必须等待用户确认，不允许绕过确认。
+- 如果 draft 返回多个候选，先询问用户选择哪条提醒。
+- `snooze`、`arrived`、`disable_reminder`、`change_offset` 当前只记录状态或偏好，不直接修改 Calendar。
+- Calendar Skill 不读取微信 token，不直连微信 API，不请求外部网络。
+- 不删除 outbox，不修改 outbox message 内容。
+
 ## Hermes Cron Outbox Bridge
 
 当前仓库包含 Hermes Cron Outbox Bridge：

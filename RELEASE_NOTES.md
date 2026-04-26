@@ -176,6 +176,28 @@ Apple Calendar
   微信消息会带 `Cronjob Response` 包装；
   初期建议 `limit=1`、`every 5m`。
 
+### Phase 38 Reminder Follow-up Actions
+
+- 新增 `scripts/reminder_context.py`：
+  只读 `data/outbox_messages.jsonl`，读取最近 calendar reminder outbox 记录，
+  并提取 `calendar/title/start/end/location/fingerprint/offset_minutes`。
+- 新增 `scripts/reminder_action_parser.py`：
+  支持 `snooze`、`cancel`、`reschedule`、`arrived`、`disable_reminder`、
+  `change_offset`、`unknown`。
+- 新增 `scripts/reminder_action_flow.py`：
+  `draft --text "<用户原文>"` 生成确认草稿并写入
+  `data/pending_confirmations.json`；
+  `confirm --session-key <key>` 在确认后执行或记录动作。
+- 新增文档：`docs/reminder-action-flow.md`。
+- 安全边界：
+  draft 阶段不修改 Calendar；
+  删除和改期必须 confirm；
+  不读取微信 token，不直连微信 API，不请求外部网络；
+  不删除 outbox，不修改 outbox message 内容。
+- 当前限制：
+  `snooze`、`arrived`、`disable_reminder`、`change_offset` 本阶段先记录状态或偏好，
+  不直接修改 Calendar 或全局提醒配置。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

@@ -104,6 +104,13 @@ Hermes profile runtime configuration, not part of this repository, and different
 profiles should keep their own wrapper under
 `~/.hermes/profiles/<profile>/scripts/`.
 
+Phase 38 reminder action update: WeChat reminder follow-up replies can now be
+parsed into confirmation-required drafts. Replies such as `延后30分钟`, `取消这个日程`,
+`改到明天上午10点`, `已到达`, `不再提醒`, and `提前30分钟提醒我` are handled through
+`scripts/reminder_action_flow.py`. Drafting never modifies Calendar; cancel and
+reschedule actions only execute after explicit confirmation. See
+[docs/reminder-action-flow.md](docs/reminder-action-flow.md).
+
 ## Calendar Policy
 
 Read calendars:
@@ -228,6 +235,13 @@ Dry-run consume pending outbox messages:
 
 ```bash
 python3 scripts/outbox_consumer.py dry-run --limit 10
+```
+
+Draft a reminder follow-up action:
+
+```bash
+python3 scripts/reminder_action_flow.py draft --text "延后30分钟"
+python3 scripts/reminder_action_flow.py confirm --session-key "<session_key>"
 ```
 
 Hermes local outbox CLI:
