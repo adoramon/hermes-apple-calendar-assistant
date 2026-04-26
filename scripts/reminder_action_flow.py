@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import calendar_ops, reminder_action_parser, reminder_context, util
+    from . import assistant_persona, calendar_ops, reminder_action_parser, reminder_context, util
 except ImportError:  # Allows running as: python3 scripts/reminder_action_flow.py ...
+    import assistant_persona  # type: ignore
     import calendar_ops  # type: ignore
     import reminder_action_parser  # type: ignore
     import reminder_context  # type: ignore
@@ -45,13 +46,7 @@ def _write_pending_store(store: dict[str, Any]) -> None:
 
 
 def _parse_dt(value: Any) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip()
-    try:
-        return datetime.fromisoformat(text)
-    except ValueError:
-        return None
+    return assistant_persona.parse_datetime(value)
 
 
 def _event_identity_from_latest() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -87,20 +82,9 @@ def _build_proposed_change(intent: str, action: dict[str, Any], event: dict[str,
 
 
 def _summary(intent: str, event: dict[str, Any], proposed_change: dict[str, Any]) -> str:
-    lines = [
-        "请确认提醒后续操作：",
-        f"操作：{intent}",
-        f"日历：{event.get('calendar', '')}",
-        f"标题：{event.get('title', '')}",
-        f"原时间：{event.get('start', '')} - {event.get('end', '')}",
-    ]
-    if proposed_change.get("new_start"):
-        lines.append(f"新时间：{proposed_change['new_start']} - {proposed_change.get('new_end', '')}")
-    if proposed_change.get("snooze_minutes"):
-        lines.append(f"延后提醒：{proposed_change['snooze_minutes']} 分钟")
-    if proposed_change.get("offset_minutes"):
-        lines.append(f"提醒提前量：{proposed_change['offset_minutes']} 分钟")
-    return "\n".join(lines)
+    return assistant_persona.format_reminder_action_draft(
+        {"target_event": event, "proposed_change": proposed_change, "intent": intent}
+    )
 
 
 def draft_action(text: str) -> dict[str, Any]:
@@ -163,6 +147,7 @@ def draft_action(text: str) -> dict[str, Any]:
             "proposed_change": proposed_change,
             "needs_confirmation": True,
             "summary": pending["summary"],
+            "display_message": pending["summary"],
         },
     )
 
@@ -231,7 +216,18 @@ def confirm_action(session_key: str) -> dict[str, Any]:
     store["sessions"][session_key] = saved
     _write_pending_store(store)
     _record_state(saved, action_result["data"])
-    return _result(True, data={"session_key": session_key, "intent": intent, "result": action_result["data"]})
+    display_message = assistant_persona.format_reminder_action_confirmed(
+        {"target_event": event, "proposed_change": proposed, "intent": intent}
+    )
+    return _result(
+        True,
+        data={
+            "session_key": session_key,
+            "intent": intent,
+            "result": action_result["data"],
+            "display_message": display_message,
+        },
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:

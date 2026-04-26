@@ -64,6 +64,12 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 40 v2.0-rc 提醒文案优化与 Hermes 行为约束修正：
   Hermes Cron bridge 输出个人助理式中文提醒；微信后续回复优先进入 draft；
   明确项目操作 Apple Calendar，禁止误称同步到 Apple Reminders
+- Phase 41 v2.0-rc Apple Calendar Assistant 人格语气升级：
+  新增 `scripts/response_style.py` 统一用户可见文案，创建/修改/删除/提醒/冲突/
+  待确认草稿采用“高先生的私人行政助理”语气，并保留 JSON 结构化输出
+- Phase 42 v2.0-rc 高先生专属 AI 女助理人格系统：
+  新增 `scripts/assistant_persona.py` 正式统一人格文案函数，CLI 保留核心 JSON
+  字段并增加 `data.display_message`；Hermes 回复优先采用 display_message
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

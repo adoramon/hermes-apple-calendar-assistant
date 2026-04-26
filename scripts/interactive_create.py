@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import calendar_ops, conflict_checker
+    from . import assistant_persona, calendar_ops, conflict_checker
 except ImportError:  # Allows running as: python3 scripts/interactive_create.py demo
+    import assistant_persona  # type: ignore
     import calendar_ops  # type: ignore
     import conflict_checker  # type: ignore
 
@@ -119,17 +120,7 @@ def build_confirmation_summary(draft: dict[str, Any]) -> dict[str, Any]:
     if invalid:
         return _result(False, error=invalid[0]["message"])
 
-    lines = [
-        "请确认是否创建日程：",
-        f"日历：{draft['calendar']}",
-        f"标题：{draft['title']}",
-        f"时间：{_format_time_range_for_summary(draft['start'], draft['end'])}",
-    ]
-    if draft.get("location"):
-        lines.append(f"地点：{draft['location']}")
-    if draft.get("notes"):
-        lines.append(f"说明：{draft['notes']}")
-    return _result(True, data={"summary": "\n".join(lines)})
+    return _result(True, data={"summary": assistant_persona.format_calendar_draft(draft)})
 
 
 def save_pending_confirmation(
@@ -209,7 +200,21 @@ def confirm_pending_action(session_key: str) -> dict[str, Any]:
     except OSError as exc:
         return _result(False, error=f"Calendar event created, but state update failed: {exc}")
 
-    return _result(True, data={"session_key": session_key, "calendar_result": create_result["data"]})
+    event = {
+        "calendar": draft.get("calendar", ""),
+        "title": draft.get("title", ""),
+        "start": draft.get("start", ""),
+        "end": draft.get("end", ""),
+        "location": draft.get("location", ""),
+    }
+    return _result(
+        True,
+        data={
+            "session_key": session_key,
+            "calendar_result": create_result["data"],
+            "display_message": assistant_persona.format_calendar_created(event),
+        },
+    )
 
 
 def cancel_pending_action(session_key: str) -> dict[str, Any]:
@@ -338,12 +343,20 @@ def _create_draft_from_args(args: argparse.Namespace) -> dict[str, Any]:
         "invalid_fields": draft_data["invalid_fields"],
         "pending": save_result["data"]["pending"],
         "summary": save_result["data"]["pending"]["summary"],
+        "display_message": save_result["data"]["pending"]["summary"],
     }
     if conflict_check is not None:
         data["conflict_check"] = conflict_check
         data["has_conflict"] = conflict_check["has_conflict"]
         data["conflicts"] = conflict_check["conflicts"]
         data["suggested_slots"] = conflict_check["suggested_slots"]
+        if conflict_check["has_conflict"]:
+            data["display_message"] = assistant_persona.format_calendar_conflict(
+                conflict_check["conflicts"],
+                conflict_check["suggested_slots"],
+            )
+        else:
+            data["display_message"] = save_result["data"]["pending"]["summary"]
     return _result(True, data=data)
 
 

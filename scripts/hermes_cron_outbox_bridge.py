@@ -3,26 +3,22 @@
 from __future__ import annotations
 
 import argparse
-import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 try:
-    from . import outbox, util
+    from . import assistant_persona, outbox, util
 except ImportError:  # Allows running as: python3 scripts/hermes_cron_outbox_bridge.py ...
+    import assistant_persona  # type: ignore
     import outbox  # type: ignore
     import util  # type: ignore
 
 
 EMPTY_MODE_SILENT = "silent"
 EMPTY_MODE_MESSAGE = "message"
-EMPTY_MESSAGE = "当前没有待发送日历提醒。"
+EMPTY_MESSAGE = assistant_persona.format_no_pending_reminders()
 BRIDGE_STATUS = "sent_via_hermes_cron"
-APPLE_DATETIME_RE = re.compile(
-    r"(?P<year>\d{4})年(?P<month>\d{1,2})月(?P<day>\d{1,2})日.*?"
-    r"(?P<hour>\d{1,2}):(?P<minute>\d{2}):(?P<second>\d{2})"
-)
 
 
 def _parse_created_at(value: Any) -> tuple[int, str]:
@@ -62,77 +58,21 @@ def _metadata(record: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _parse_event_datetime(value: Any) -> datetime | None:
-    """Parse an outbox reminder event datetime into a local naive datetime."""
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip()
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        parsed = None
-    if parsed is not None:
-        if parsed.tzinfo is not None:
-            return parsed.astimezone().replace(tzinfo=None)
-        return parsed
-
-    match = APPLE_DATETIME_RE.search(text)
-    if not match:
-        return None
-    return datetime(
-        int(match.group("year")),
-        int(match.group("month")),
-        int(match.group("day")),
-        int(match.group("hour")),
-        int(match.group("minute")),
-        int(match.group("second")),
-    )
-
-
-def _format_event_time(value: Any) -> str:
-    """Format reminder time as 今天/明天 HH:MM when possible."""
-    parsed = _parse_event_datetime(value)
-    if parsed is None:
-        return str(value or "").strip()
-    today = datetime.now().date()
-    if parsed.date() == today:
-        prefix = "今天"
-    elif parsed.date() == today + timedelta(days=1):
-        prefix = "明天"
-    else:
-        prefix = parsed.strftime("%m月%d日")
-    return f"{prefix} {parsed:%H:%M}"
-
-
-def _format_offset(value: Any) -> str:
-    """Return a human-readable reminder offset."""
-    if isinstance(value, int) and value > 0:
-        return f"{value} 分钟后"
-    return "稍后"
-
-
 def _clean_text(value: Any) -> str:
     """Normalize metadata text for WeChat-friendly display."""
-    if not isinstance(value, str):
-        return str(value or "").strip()
-    return " ".join(value.split())
+    return assistant_persona.clean_text(value)
 
 
-def _record_view(record: dict[str, Any]) -> dict[str, str]:
-    """Build a safe display view for one outbox record."""
+def _record_event(record: dict[str, Any]) -> dict[str, Any]:
+    """Build a reminder event for assistant_persona."""
     metadata = _metadata(record)
-    title = _clean_text(metadata.get("title"))
-    start = _format_event_time(metadata.get("start"))
-    location = _clean_text(metadata.get("location"))
-    offset = _format_offset(metadata.get("offset_minutes"))
-
-    if not title:
-        title = _record_message_text(record)
+    title = _clean_text(metadata.get("title")) or _record_message_text(record)
     return {
         "title": title,
-        "start": start,
-        "location": location,
-        "offset": offset,
+        "start": metadata.get("start", ""),
+        "end": metadata.get("end", ""),
+        "location": metadata.get("location", ""),
+        "offset_minutes": metadata.get("offset_minutes"),
     }
 
 
@@ -147,60 +87,13 @@ def _render_records(records: list[dict[str, Any]], empty_mode: str) -> str:
     """Render selected records as Hermes-friendly plain text."""
     selected = records
 
-    views = [_record_view(record) for record in selected]
-    views = [view for view in views if view["title"] or view["start"]]
-
-    if not views:
+    events = [_record_event(record) for record in selected]
+    output = assistant_persona.format_multi_reminder_message(events)
+    if not output:
         if empty_mode == EMPTY_MODE_MESSAGE:
             return EMPTY_MESSAGE
         return ""
-
-    if len(views) == 1:
-        view = views[0]
-        lines = [
-            "📅 日程提醒",
-            "",
-            f"高先生，您 {view['offset']}有一个日程：",
-            "",
-        ]
-        if view["start"]:
-            lines.append(f"🕐 时间：{view['start']}")
-        lines.append(f"📌 事项：{view['title']}")
-        if view["location"]:
-            lines.append(f"📍 地点：{view['location']}")
-        lines.extend(
-            [
-                "",
-                "您可以直接回复：",
-                "- 推迟30分钟",
-                "- 取消这个日程",
-                "- 改到明天上午10点",
-                "- 已到达",
-            ]
-        )
-        return "\n".join(lines)
-
-    lines = [
-        "📅 日程提醒",
-        "",
-        f"高先生，您有 {len(views)} 个即将开始的日程：",
-        "",
-    ]
-    for index, view in enumerate(views, start=1):
-        lines.append(f"{index}. 🕐 {view['start'] or view['offset']}")
-        lines.append(f"   📌 {view['title']}")
-        if view["location"]:
-            lines.append(f"   📍 {view['location']}")
-        if index != len(views):
-            lines.append("")
-
-    lines.extend(
-        [
-            "",
-            "您可以直接回复：推迟30分钟、取消这个日程、改到明天上午10点、已到达",
-        ]
-    )
-    return "\n".join(lines)
+    return output
 
 
 def _mark_records_sent(records: list[dict[str, Any]]) -> None:

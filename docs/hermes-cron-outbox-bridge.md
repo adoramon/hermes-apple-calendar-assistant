@@ -35,33 +35,30 @@ python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent 
 ```
 
 - `silent`：无 pending 时 stdout 为空
-- `message`：无 pending 时输出 `当前没有待发送日历提醒。`
+- `message`：无 pending 时输出 `高总，当前没有待发送的日程提醒。`
 - `--mark-sent`：输出后把这些记录标记为 `sent_via_hermes_cron`
 
 示例输出：
 
 ```text
-📅 日程提醒
+高先生，提醒您一下 ⏰
 
-高先生，您 60 分钟后有一个日程：
+您还有 60 分钟有个安排：
 
-🕐 时间：今天 13:00
-📌 事项：再次测试
-📍 地点：望京北路9号叶青大厦D座7层
+📌 再次测试
+🕐 今天 13:00
+📍 望京北路9号叶青大厦D座7层
 
 您可以直接回复：
 - 推迟30分钟
-- 取消这个日程
 - 改到明天上午10点
-- 已到达
+- 取消这个日程
 ```
 
 多条提醒时：
 
 ```text
-📅 日程提醒
-
-高先生，您有 2 个即将开始的日程：
+高总，接下来有 2 个安排，我帮您盯着时间 📅
 
 1. 🕐 今天 13:00
    📌 再次测试
@@ -70,7 +67,7 @@ python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent 
 2. 🕐 今天 15:00
    📌 客户会议
 
-您可以直接回复：推迟30分钟、取消这个日程、改到明天上午10点、已到达
+需要调整的话，直接回复我就行。
 ```
 
 输出要求：

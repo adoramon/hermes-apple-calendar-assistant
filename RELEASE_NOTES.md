@@ -246,6 +246,38 @@ Apple Calendar
   draft 后说“已生成操作草稿，尚未修改日程。”；
   confirm 成功后说“已更新 Apple Calendar 日程。”。
 
+### Phase 41 Apple Calendar Assistant Persona Style
+
+- 新增 `scripts/response_style.py`，集中管理用户可见中文文案。
+- 新增文档：`docs/persona-style.md`。
+- 创建日程成功、修改日程成功、删除日程成功、日程提醒推送、冲突提醒、待确认草稿、
+  迟到/出发提醒统一采用“高先生的私人行政助理”语气。
+- 风格要求：
+  温柔、自然、熟悉感、轻松、高效、贴心、稍微活泼；
+  emoji 每次 0 到 2 个；
+  禁止低幼撒娇、过度暧昧、网络土味、夸张表情包风和长篇废话。
+- 输出层已尽量接入相关脚本，同时保留 JSON structured data 兼容 CLI 和 Hermes
+  自动化。
+
+### Phase 42 Dedicated Assistant Persona System
+
+- 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：
+  `format_calendar_created`、`format_calendar_updated`、`format_calendar_deleted`、
+  `format_calendar_draft`、`format_calendar_conflict`、`format_reminder_message`、
+  `format_multi_reminder_message`、`format_reminder_action_draft`、
+  `format_reminder_action_confirmed`、`format_no_pending_reminders`、
+  `format_error_friendly`。
+- 新增 `docs/persona-examples.md`，更新 `docs/persona-style.md`。
+- `scripts/hermes_cron_outbox_bridge.py` stdout 改为使用 persona 格式。
+- `scripts/message_adapter.py` 使用 persona 函数生成 reminder message。
+- `scripts/reminder_action_flow.py` 的 draft/confirm 输出增加 `data.display_message`。
+- `scripts/interactive_create.py` 的 create-draft/confirm 输出增加 `data.display_message`。
+- Skill 规则新增：
+  回复用户时优先使用 `display_message`；
+  如果脚本返回 `display_message`，Hermes 应直接采用或轻微整理，不改变事实；
+  创建/修改/删除成功只能基于脚本 `ok=true`；
+  禁止编造 Apple Reminders 同步结果。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

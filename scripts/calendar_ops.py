@@ -13,6 +13,11 @@ import sys
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+try:
+    from . import assistant_persona
+except ImportError:  # Allows running as: python3 scripts/calendar_ops.py ...
+    import assistant_persona  # type: ignore
+
 
 MONTH_NAMES = (
     "January",
@@ -265,7 +270,21 @@ end tell
     ok, stdout, error = _run_osascript(script)
     if not ok:
         return _result(False, error=error)
-    return _result(True, data={"uid": stdout, "title": title})
+    event = {
+        "calendar": calendar_name,
+        "title": title,
+        "start": start_dt,
+        "end": end_dt,
+        "location": location,
+    }
+    return _result(
+        True,
+        data={
+            "uid": stdout,
+            "title": title,
+            "display_message": assistant_persona.format_calendar_created(event),
+        },
+    )
 
 
 def update_event(
@@ -346,6 +365,12 @@ end tell
     uid = fields[0] if len(fields) > 0 else ""
     original_title = fields[1] if len(fields) > 1 else old_title
     updated_title = fields[2] if len(fields) > 2 else new_title or old_title
+    event = {
+        "calendar": calendar_name,
+        "title": updated_title,
+        "start": start_dt,
+        "end": end_dt,
+    }
     return _result(
         True,
         data={
@@ -353,6 +378,7 @@ end tell
             "original_title": original_title,
             "title": updated_title,
             "updated_fields": updated_fields,
+            "display_message": assistant_persona.format_calendar_updated(event),
         },
     )
 
@@ -426,6 +452,9 @@ end tell
             "original_location": original_location,
             "location": updated_location,
             "updated_fields": ["location"],
+            "display_message": assistant_persona.format_calendar_updated(
+                {"calendar": calendar_name, "title": updated_title, "location": updated_location}
+            ),
         },
     )
 
@@ -453,7 +482,13 @@ end tell
         return _result(False, error=error)
     if stdout == "NOT_FOUND":
         return _result(False, error=f"No event found with title: {title}")
-    return _result(True, data={"deleted_title": stdout})
+    return _result(
+        True,
+        data={
+            "deleted_title": stdout,
+            "display_message": assistant_persona.format_calendar_deleted({"title": stdout, "calendar": calendar_name}),
+        },
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:

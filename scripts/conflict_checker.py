@@ -10,8 +10,9 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 try:
-    from . import calendar_ops, settings, util
+    from . import assistant_persona, calendar_ops, settings, util
 except ImportError:  # Allows running as: python3 scripts/conflict_checker.py ...
+    import assistant_persona  # type: ignore
     import calendar_ops  # type: ignore
     import settings  # type: ignore
     import util  # type: ignore
@@ -188,6 +189,9 @@ def check_conflicts(calendar_name: str, start_text: str, end_text: str) -> dict[
             "has_conflict": bool(conflicts),
             "conflicts": conflicts,
             "suggested_slots": suggested_slots,
+            "display_message": assistant_persona.format_calendar_conflict(conflicts, suggested_slots)
+            if conflicts
+            else "",
         }
     )
 

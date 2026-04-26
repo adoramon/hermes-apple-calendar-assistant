@@ -136,6 +136,14 @@ tab-delimited empty fields, cleans multi-line fields, and uses the verified
 `whose its start date/end date` syntax. See
 [docs/calendar-event-query-bugfix.md](docs/calendar-event-query-bugfix.md).
 
+Phase 42 persona system update: user-facing Calendar replies now use the
+dedicated “高总的私人行政助理” persona. `scripts/assistant_persona.py` centralizes
+wording for create/update/delete success, reminder pushes, conflict notices,
+pending drafts, reminder follow-up actions, and friendly errors. CLI JSON keeps
+its core fields and exposes persona text through `data.display_message`. See
+[docs/persona-style.md](docs/persona-style.md) and
+[docs/persona-examples.md](docs/persona-examples.md).
+
 ## Calendar Policy
 
 Read calendars:
