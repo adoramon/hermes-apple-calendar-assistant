@@ -47,6 +47,9 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 32 v2.0-rc Hermes Cron Outbox Bridge 发送后标记：
   新增 `--mark-sent`，bridge 输出后可将记录标记为
   `sent_via_hermes_cron`，避免重复发送
+- Phase 33 v2.0-rc Hermes Cron Outbox Bridge 正式启用：
+  reminder_worker launchd + Hermes Cron bridge + Hermes Cron Delivery 已作为
+  当前真实微信提醒链路启用，`outbox_consumer` dry-run launchd 已暂停避免抢占
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

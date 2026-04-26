@@ -152,6 +152,24 @@ Apple Calendar
   bridge 标记发生在 Hermes Cron stdout handoff 后，
   如果后续 Delivery 失败，目前无法自动回滚。
 
+### Phase 33 Hermes Cron Outbox Bridge Enabled
+
+- 当前正式启用链路已记录：
+  `Apple Calendar -> reminder_worker launchd -> outbox_messages.jsonl -> Hermes Cron bridge script -> Hermes Cron Delivery -> Weixin Adapter -> 微信`。
+- 已记录正式启用命令：
+  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script "/Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent" --deliver "weixin:<chat_id>"`。
+- 已记录为什么需要暂停 `outbox_consumer` dry-run launchd：
+  它会把 `pending` 抢先消费为 `sent_dry_run`，导致 Hermes Cron bridge 读不到待发送
+  消息。
+- 已记录 `sent_via_hermes_cron` 的含义：
+  记录已交给 Hermes Cron stdout 进入 Delivery 链路，bridge 不会再次发送。
+- 已明确：Calendar Skill 不读取 token，不直连微信，真实发送仍由 Hermes Cron
+  Delivery 完成。
+- 已记录当前限制：
+  Hermes Cron Delivery 失败后无法自动回滚 `sent_via_hermes_cron`；
+  微信消息会带 `Cronjob Response` 包装；
+  初期建议 `limit=1`、`every 5m`。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

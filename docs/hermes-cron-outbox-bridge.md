@@ -1,6 +1,6 @@
 # Hermes Cron Outbox Bridge
 
-当前状态：`v2.0-rc local dispatch dry-run`。
+当前状态：`v2.0-rc Hermes Cron bridge enabled`。
 
 `scripts/hermes_cron_outbox_bridge.py` 是一个专门给 Hermes cron `--script` 调用的
 outbox bridge。它读取本地 `pending` outbox，输出适合 Hermes Cron Delivery 发送
@@ -70,6 +70,37 @@ sunny-wechat-lite cron create "every 5m" \
 推荐在 Hermes profile 内部使用 cron `--script` 读取 outbox，并把 stdout 通过
 `--deliver` 投递到 `weixin:<chat_id>`。
 
+当前正式启用命令即为上面的 cron create 命令。
+
+## 正式启用链路
+
+```text
+Apple Calendar
+  -> reminder_worker launchd
+  -> outbox_messages.jsonl
+  -> Hermes Cron bridge script
+  -> Hermes Cron Delivery
+  -> Weixin Adapter
+  -> 微信
+```
+
+在这条链路中：
+
+- Calendar Skill 不读取 Hermes token。
+- Calendar Skill 不直连微信。
+- 真实发送由 Hermes Cron Delivery 完成。
+- `sent_via_hermes_cron` 表示记录已经交给 Hermes Cron stdout 进入 Delivery 链路，
+  bridge 不再重复发送。
+
+## 为什么需要暂停 outbox_consumer dry-run launchd
+
+`outbox_consumer.py` dry-run launchd 会读取 `pending` 并把状态改成
+`sent_dry_run`。如果它保持运行，Hermes Cron bridge 可能在读取前就失去这些待发送
+记录，从而造成真实投递链路读不到消息。
+
+因此，在 Hermes Cron bridge 正式启用后，`outbox_consumer` dry-run launchd 必须
+保持暂停，避免抢占 `pending` 消息。
+
 ## 当前阶段边界
 
 - 默认行为仍可只读 `pending`，不标记 `sent`。
@@ -102,11 +133,12 @@ bridge 写入的 result 结构为：
 
 - `--mark-sent` 表示交给 Hermes Cron stdout 后即标记 `sent_via_hermes_cron`。
 - 如果 Hermes Cron Delivery 之后失败，目前无法自动回滚。
-- 因此建议先用低频率、`limit=1` 验证。
+- 初期建议先用低频率、`limit=1`、`every 5m` 验证。
 
 ## 风险说明
 
 - `--mark-sent` 的标记时点早于 Hermes 最终投递结果。
 - 如果 Hermes Cron Delivery 之后失败，目前无法自动回滚。
 - 如果不传 `--mark-sent`，`pending` 会重复发送。
+- 微信消息会带 `Cronjob Response` 包装。
 - 正式启用时仍建议从低频率、小 `limit` 开始。
