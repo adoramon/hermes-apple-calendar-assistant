@@ -38,6 +38,9 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 29 v2.0-rc Hermes DeliveryRouter 真实发送技术预研：
   记录 `gateway.delivery.DeliveryRouter` 结构，确认独立 Skill 无法获得 live
   adapters，因此当前不能直接调用真实发送
+- Phase 30 v2.0-rc Hermes Cron Delivery 真实投递路径验证：
+  已验证 `Hermes Cron -> DeliveryRouter -> Weixin Adapter -> 微信` 链路可用，
+  但 Calendar Skill 仍不直接读取 token、不直连微信 API
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

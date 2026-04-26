@@ -81,6 +81,32 @@ Apple Calendar
   探查 hermes cron 是否支持 delivery targets，并尝试用 hermes cron/webhook
   触发“读取 outbox 并回复到 weixin home channel”。
 
+### Phase 30 Hermes Cron Delivery Validation
+
+- 新增验证文档：`docs/hermes-cron-delivery-test.md`。
+- 新增 ADR：`docs/decision-records/ADR-004-hermes-cron-delivery.md`。
+- 已记录验证命令模板：
+  `sunny-wechat-lite cron create ... --deliver "weixin:<chat_id>"`、
+  `sunny-wechat-lite cron tick`、
+  `sunny-wechat-lite cron list`。
+- 成功判断标准已记录为：微信收到 `Cronjob Response`。
+- 本机验证成功结论已记录：
+  `Hermes Cron -> DeliveryRouter -> Weixin Adapter -> 微信`。
+- 文档明确：Hermes Cron Delivery 可以作为真实微信提醒发送路径。
+- 文档明确：Calendar Skill 仍不直接读取 `weixin` token，也不直连
+  `ilink` / Weixin API。
+- 已记录推荐后续真实发送架构：
+  `Calendar Skill -> outbox -> Hermes Cron job -> cron script stdout -> Hermes Cron --deliver -> weixin:<chat_id>`。
+- 已记录优先原因：
+  token 留在 Hermes profile 内、使用 Hermes 原生 `DeliveryRouter`、支持审计与
+  job 管理、不绕过 gateway。
+- 已记录风险：
+  Cronjob Response 包装、消息频率控制、重复发送、empty outbox。
+- Phase 31 建议：
+  新增 cron 脚本只输出 pending outbox 文本，并用
+  `sunny-wechat-lite cron create --script ... --deliver weixin:<chat_id>`
+  验证；先保持 dry-run 消费，再评估是否引入 `sent_via_hermes_cron`。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

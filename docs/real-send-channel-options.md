@@ -72,7 +72,7 @@ calendar assistant 直接调用 Telegram Bot API 发送提醒。
 
 ## 推荐方案
 
-推荐方案 A：Hermes 本地回调 / 本地 CLI。
+推荐方案 A：Hermes Cron Delivery / Hermes 本地回调。
 
 选择原因：
 
@@ -81,6 +81,15 @@ calendar assistant 直接调用 Telegram Bot API 发送提醒。
 - 不绕过 Hermes。
 - 后续可由 Hermes 做权限、审计、人工确认和最终投递。
 - 与当前 `hermes_dispatcher.py` dry-run 占位方向一致。
+
+Phase 30 补充结论：
+
+- 已验证 `sunny-wechat-lite cron create --deliver "weixin:<chat_id>"` 可真实送达
+  微信。
+- 已验证链路：
+  `Hermes Cron -> DeliveryRouter -> Weixin Adapter -> 微信`。
+- 因此后续真实发送的优先落地方向应为 Hermes Cron Delivery，而不是 calendar
+  assistant 直连微信。
 
 ## 实现前必须确认
 
@@ -91,5 +100,11 @@ calendar assistant 直接调用 Telegram Bot API 发送提醒。
 - Hermes 如何记录发送审计和失败原因。
 - Hermes 如何处理重复消息、撤回和紧急停用。
 - Hermes cron / webhook 是否可在 runtime 内直接使用 delivery targets。
+
+Phase 30 之后仍需继续确认：
+
+- Cronjob Response 包装是否可接受，或是否需要后续优化展示方式。
+- Cron 读取 outbox 时如何避免 empty outbox 输出。
+- 如何做频率限制和重复发送控制。
 
 在以上问题确认前，保持 `real_send_enabled=false`，不要启用真实发送。

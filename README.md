@@ -58,6 +58,14 @@ gateway permission and audit boundaries. See
 [docs/hermes-delivery-router-research.md](docs/hermes-delivery-router-research.md)
 and [docs/decision-records/ADR-003-hermes-delivery-router.md](docs/decision-records/ADR-003-hermes-delivery-router.md).
 
+Phase 30 validation update: local testing confirmed that Hermes Cron Delivery
+can reach WeChat through `Hermes Cron -> DeliveryRouter -> Weixin Adapter ->
+微信`. This repository still must not read `weixin` token or call `ilink` /
+Weixin APIs directly; the recommended future real-send architecture is Calendar
+Skill outbox generation plus Hermes Cron `--deliver` inside the Hermes runtime.
+See [docs/hermes-cron-delivery-test.md](docs/hermes-cron-delivery-test.md) and
+[docs/decision-records/ADR-004-hermes-cron-delivery.md](docs/decision-records/ADR-004-hermes-cron-delivery.md).
+
 ## Calendar Policy
 
 Read calendars:
