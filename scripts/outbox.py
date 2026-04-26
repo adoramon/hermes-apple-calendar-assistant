@@ -87,6 +87,33 @@ def update_outbox_status(record_id: str, status: str, result: dict[str, Any] | N
     return {"ok": True, "error": None, "record": updated_record}
 
 
+def update_outbox_statuses(
+    record_ids: list[str],
+    status: str,
+    result: dict[str, Any] | None = None,
+    only_if_status: str | None = None,
+) -> dict[str, Any]:
+    """Update multiple outbox records by id, optionally filtering by current status."""
+    target_ids = {record_id for record_id in record_ids if isinstance(record_id, str) and record_id}
+    if not target_ids:
+        return {"ok": True, "error": None, "updated_records": []}
+
+    records = load_outbox_records()
+    updated_records = []
+    for record in records:
+        record_id = record.get("id")
+        if record_id not in target_ids:
+            continue
+        if only_if_status is not None and record.get("status") != only_if_status:
+            continue
+        record["status"] = status
+        if result is not None:
+            record["result"] = dict(result)
+        updated_records.append(record)
+    save_outbox_records_atomic(records)
+    return {"ok": True, "error": None, "updated_records": updated_records}
+
+
 def get_pending_outbox(limit: int = 20) -> list[dict[str, Any]]:
     """Return pending outbox records, oldest first."""
     pending = [record for record in load_outbox_records() if record.get("status") == "pending"]
@@ -188,6 +215,7 @@ def _summarize_record(record: dict[str, Any]) -> dict[str, Any]:
         "message": message.get("message", ""),
         "result": {
             "mode": result.get("mode", ""),
+            "note": result.get("note", ""),
             "reason": result.get("reason", ""),
             "processed_at": result.get("processed_at", ""),
             "sender": result.get("sender", ""),

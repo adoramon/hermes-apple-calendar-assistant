@@ -244,20 +244,25 @@ Outbox 安全边界：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent
 ```
 
 用途：
 
 - 供 Hermes cron `--script` 读取 `pending` outbox
 - 输出适合 Hermes Cron Delivery 的纯文本
-- 当前只读，不标记 sent，不删除 outbox
+- 可选 `--mark-sent`，将已输出记录标记为 `sent_via_hermes_cron`
+- 不删除 outbox
 
 规则：
 
 - 当前 Hermes 对话仍可读取 pending outbox：
   `python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hermes_outbox_cli.py pending --limit 10`
-- Cron bridge 当前只读，不应长期启用。
-- 在进入 Phase 32 前，不要把 Cron bridge 当作正式真实发送链路长期运行。
+- 真实微信发送由 Hermes Cron Delivery 完成，不由 Calendar Skill 直接完成。
+- Calendar Skill 不直接发微信，不读取 Hermes token，不直连 WeChat API。
+- outbox 记录被 bridge 标记为 `sent_via_hermes_cron` 后不再重复发送。
+- 如果不传 `--mark-sent`，bridge 仍是只读模式。
+- 即使已支持 `--mark-sent`，正式启用时也应先低频率、小 `limit` 验证。
 - 如果 bridge 输出为空，Hermes cron 不应把它解释为发送成功。
 
 ## Flight Location Enhancement

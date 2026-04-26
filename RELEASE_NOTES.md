@@ -129,6 +129,29 @@ Apple Calendar
 - 风险已记录：
   如果只读不标记，pending 会重复发送，因此正式启用前必须进入 Phase 32。
 
+### Phase 32 Hermes Cron Outbox Bridge Mark-after-output
+
+- 更新 `scripts/hermes_cron_outbox_bridge.py`，新增 `--mark-sent`。
+- 当执行
+  `python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent`
+  时，bridge 会：
+  读取 `pending`、输出提醒文本到 stdout、并把这些记录标记为
+  `sent_via_hermes_cron`。
+- 写入 result：
+  `mode=hermes_cron`、`processed_at=<ISO时间>`、
+  `note="Message handed to Hermes Cron stdout for delivery"`。
+- 幂等规则已明确：
+  只处理 `pending`；
+  `sent_via_hermes_cron`、`sent_dry_run` 和失败状态当前都不再输出。
+- 不传 `--mark-sent` 时，保持 Phase 31 只读行为。
+- `scripts/outbox.py list --limit 20` 现在可直接展示
+  `sent_via_hermes_cron` 状态，并显示 result.note。
+- 文档新增正式启用命令：
+  `sunny-wechat-lite cron create "every 5m" --name "calendar-outbox-wechat-bridge" --script ".../scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent" --deliver "weixin:<chat_id>"`。
+- 风险已记录：
+  bridge 标记发生在 Hermes Cron stdout handoff 后，
+  如果后续 Delivery 失败，目前无法自动回滚。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

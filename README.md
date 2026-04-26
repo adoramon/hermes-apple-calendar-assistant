@@ -73,6 +73,14 @@ validation and integration preparation only; until Phase 32 adds status marking,
 it must not be treated as a long-running real-send workflow. See
 [docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md).
 
+Phase 32 bridge update: the Hermes Cron Outbox Bridge now supports
+`--mark-sent`, which marks selected `pending` records as
+`sent_via_hermes_cron` after rendering them to stdout for Hermes Cron delivery.
+Real WeChat sending is still completed by Hermes Cron Delivery, not by this
+repository. The bridge still does not read Hermes tokens, does not call WeChat
+APIs directly, and does not modify message content. See
+[docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md).
+
 ## Calendar Policy
 
 Read calendars:

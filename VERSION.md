@@ -44,6 +44,9 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 31 v2.0-rc Hermes Cron Outbox Bridge：
   新增只读 bridge 脚本供 `cron --script` 读取 pending outbox 并输出纯文本，
   当前不标记 sent，不应长期启用
+- Phase 32 v2.0-rc Hermes Cron Outbox Bridge 发送后标记：
+  新增 `--mark-sent`，bridge 输出后可将记录标记为
+  `sent_via_hermes_cron`，避免重复发送
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha
