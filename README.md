@@ -149,7 +149,24 @@ Hermes from a screenshot, can now be parsed into a Calendar draft. The flow asks
 the user to choose `个人计划` or `夫妻计划`, requires a concrete check-in time, and
 only writes Apple Calendar after explicit confirmation. It does not write
 `飞行计划`, create reminders, operate Apple Reminders, request the network, or
-perform OCR itself. See [docs/hotel-order-flow.md](docs/hotel-order-flow.md).
+perform OCR itself. If a user sends a screenshot and Hermes extracts hotel-order
+text, the Skill should automatically enter the hotel draft flow without asking
+the user to label it as a hotel order. See
+[docs/hotel-order-flow.md](docs/hotel-order-flow.md) and
+[docs/hotel-order-image-detection.md](docs/hotel-order-image-detection.md).
+
+Phase 44 hotel screenshot WeChat acceptance update: the expected WeChat path is
+now documented as screenshot -> Hermes image text extraction ->
+`hotel_order_flow.py draft` -> missing-field follow-up for `个人计划` / `夫妻计划`
+and check-in time -> `hotel_order_flow.py update-draft` -> explicit user
+confirmation -> `hotel_order_flow.py confirm` -> Apple Calendar write. The
+expected logs should include `hotel_order_flow.py draft`,
+`hotel_order_flow.py update-draft`, and `hotel_order_flow.py confirm`. If Hermes
+only summarizes the screenshot, defaults to `个人计划`, asks whether to write the
+hotel into a flight note, or calls generic `interactive_create.py`, the routing
+is wrong and should be debugged through the profile logs. The flow still must
+not write `商务计划`, `家庭计划`, `飞行计划`, or Apple Reminders, and must not write
+Calendar before confirmation.
 
 ## Calendar Policy
 

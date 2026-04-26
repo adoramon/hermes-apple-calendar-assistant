@@ -73,6 +73,14 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 43 v2.0-rc 酒店订单识别与行程写入：
   新增酒店订单规则解析和确认式草稿流程，仅允许写入 `个人计划` / `夫妻计划`，
   必须确认入住时间，确认后才写入 Apple Calendar
+- Phase 43 补充：酒店订单截图自动识别入口：
+  Hermes / 多模态模型先提取截图文字，疑似酒店订单时自动进入
+  `hotel_order_flow.py draft`，不要求用户额外说明“这是酒店订单”
+- Phase 44 v2.0-rc 酒店订单截图微信实测文档收口：
+  记录微信截图实测验收链路：截图文字提取后必须进入
+  `hotel_order_flow.py draft`，缺少字段时继续追问 `个人计划` / `夫妻计划`
+  和入住时间，用户确认后才调用 `hotel_order_flow.py confirm` 写入 Apple
+  Calendar；日志关键字为 `draft`、`update-draft`、`confirm`
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

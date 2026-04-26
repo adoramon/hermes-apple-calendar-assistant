@@ -259,6 +259,28 @@ Apple Calendar
 - 输出层已尽量接入相关脚本，同时保留 JSON structured data 兼容 CLI 和 Hermes
   自动化。
 
+### Phase 44 Hotel Order Screenshot WeChat Acceptance Documentation
+
+- 已记录微信端酒店订单截图实测验收流程：
+  用户发送酒店订单截图后，Hermes 先提取图片文字，疑似酒店订单时自动调用
+  `python3 scripts/hotel_order_flow.py draft --text "<截图中提取出的订单文字>"`。
+- 已明确缺失字段追问：
+  缺少日历时必须追问写入 `个人计划` 还是 `夫妻计划`；
+  缺少入住时间时必须追问具体 `HH:MM` 入住时间。
+- 用户补充字段后，应调用：
+  `hotel_order_flow.py update-draft --session-key <key> --calendar ... --checkin-time ...`。
+- 用户明确确认后，才调用：
+  `hotel_order_flow.py confirm --session-key <key>` 写入 Apple Calendar。
+- 预期日志关键字已记录：
+  `hotel_order_flow.py draft`、`hotel_order_flow.py update-draft`、
+  `hotel_order_flow.py confirm`。
+- 已记录失败排查方向：
+  图片文字识别失败、未进入 `hotel_order_flow`、缺少入住时间、缺少日历选择。
+- 安全边界保持不变：
+  不写 `商务计划`、`家庭计划`、`飞行计划`；
+  不写 Apple Reminders；
+  不直接写 Calendar，必须先草稿、再确认。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：
@@ -297,6 +319,12 @@ Apple Calendar
 - 截图场景：
   如果 Hermes 已提取 OCR 文本，则把文字传给 hotel order flow；
   如果没有文字内容，应请用户提供订单文字或先进行截图文字读取。
+- 补充酒店订单截图自动识别入口：
+  当用户发送图片/截图，且 Hermes / 多模态模型提取出的文字包含酒店、入住、离店、
+  订单号、房型或 OTA 平台线索时，应自动调用
+  `hotel_order_flow.py draft --text "<截图中提取出的订单文字>"`。
+- 新增文档：`docs/hotel-order-image-detection.md`。
+- 明确不修改 OCR 代码、不引入 OCR 依赖、不请求外部网络、不直接写 Calendar。
 
 ## v2.0-beta Dry-run Accepted
 

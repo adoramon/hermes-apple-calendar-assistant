@@ -215,13 +215,83 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_
 7. 不得写入 `商务计划`、`家庭计划`、`飞行计划`。
 8. 不得创建提醒事项。
 9. 不得写 Apple Reminders。
-10. 如果截图没有 OCR 文本，应回复：
+10. 当用户发送图片/截图时，先读取或提取图片中文字。如果图片文字包含以下线索，应视为酒店订单候选：
+
+- 酒店 / 宾馆 / 民宿 / 公寓 / 入住 / 离店 / 入住人
+- 订单号 / 确认号 / 预订号
+- 房型 / 间夜 / 到店 / 离店
+- 携程 / 飞猪 / 美团 / Booking / Agoda / Airbnb / Trip.com
+
+11. 如果截图文字疑似酒店订单，必须自动调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py draft --text "<截图中提取出的订单文字>"
+```
+
+12. 不需要用户再说明“这是酒店订单”。
+13. 如果 `hotel_order_flow.py` 返回 `is_hotel_order=true` 或酒店订单草稿，展示酒店行程草稿。
+14. 如果缺少日历或入住时间，主动询问用户。
+15. 不要把酒店订单当普通聊天处理。
+16. 不要只总结订单内容，要进入日程草稿流程。
+17. 如果截图没有 OCR 文本，应回复：
 
 ```text
-我需要先看到订单里的文字信息，您可以把截图里的订单文字复制给我，或者让我读取截图文字后再整理。
+高先生，这张截图我暂时没读清订单文字。您可以把酒店订单里的文字复制给我，我来帮您整理入住行程。
 ```
 
 如果脚本返回 `data.display_message`，Hermes 应优先采用该文案。
+
+### Hotel Order Screenshot WeChat Acceptance
+
+微信端实测验收流程必须是：
+
+1. 用户发送酒店订单截图。
+2. Hermes / 多模态模型提取图片中文字。
+3. 疑似酒店订单时，自动调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py draft --text "<截图中提取出的订单文字>"
+```
+
+4. 如果缺少 `calendar`，追问用户写入 `个人计划` 还是 `夫妻计划`。
+5. 如果缺少 `checkin_time`，追问入住当天具体时间，例如 `23:30`。
+6. 用户补充字段后，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py update-draft \
+  --session-key "<session_key>" \
+  --calendar "个人计划" \
+  --checkin-time "23:30"
+```
+
+7. 用户明确确认后，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_order_flow.py confirm --session-key "<session_key>"
+```
+
+预期日志关键字：
+
+- `hotel_order_flow.py draft`
+- `hotel_order_flow.py update-draft`
+- `hotel_order_flow.py confirm`
+
+失败排查：
+
+- 如果只总结图片内容，没有出现 `hotel_order_flow.py draft`，说明没有进入酒店订单流程。
+- 如果直接调用 `interactive_create.py create-draft`，说明错误地走了普通日程创建流程。
+- 如果默认写入 `个人计划`，说明没有正确追问日历选择。
+- 如果询问是否写入航班备注，说明被航班上下文误导，应回到酒店订单流程。
+- 如果缺少入住时间，应追问具体时间，不要自行猜测。
+
+硬性边界：
+
+- 不写 `商务计划`。
+- 不写 `家庭计划`。
+- 不写 `飞行计划`。
+- 不写 Apple Reminders。
+- 不创建提醒事项。
+- 不直接写入 Calendar，必须先草稿、再确认。
 
 ## Update Rules
 
