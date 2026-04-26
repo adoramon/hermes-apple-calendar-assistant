@@ -60,16 +60,42 @@ python3 scripts/flight_auto_enhancer.py run
 
 ## 如何创建 Hermes cron job
 
-先在 `sunny-wechat-lite` profile 的专属脚本目录安装 bridge wrapper：
+先在 `sunny-wechat-lite` profile 的专属脚本目录安装 Python wrapper：
 
 ```bash
 mkdir -p ~/.hermes/profiles/sunny-wechat-lite/scripts
-cat > ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh <<'SH'
-#!/bin/zsh
-cd /Users/administrator/Code/hermes-apple-calendar-assistant
-python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent --empty-mode silent
-SH
-chmod +x ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh
+cat > ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.py <<'PY'
+#!/usr/bin/env python3
+import sys
+import subprocess
+
+PROJECT = "/Users/administrator/Code/hermes-apple-calendar-assistant"
+
+cmd = [
+    sys.executable,
+    "scripts/hermes_cron_outbox_bridge.py",
+    "read-pending",
+    "--limit", "1",
+    "--mark-sent",
+    "--empty-mode", "silent",
+]
+
+proc = subprocess.run(
+    cmd,
+    cwd=PROJECT,
+    capture_output=True,
+    text=True,
+)
+
+if proc.stdout:
+    print(proc.stdout.strip())
+
+if proc.stderr:
+    print(proc.stderr.strip(), file=sys.stderr)
+
+sys.exit(proc.returncode)
+PY
+chmod +x ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.py
 ```
 
 注意：不同 Hermes profile 应使用各自的 profile 专属脚本目录，而不是全局
@@ -81,8 +107,9 @@ chmod +x ~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh
 
 ```bash
 sunny-wechat-lite cron create "every 5m" \
+  "请将脚本输出内容原样发送给我；如果为空则不要回复。" \
   --name "calendar-outbox-wechat-bridge" \
-  --script "~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh" \
+  --script "calendar_outbox_bridge.py" \
   --deliver "weixin:<chat_id>"
 ```
 
@@ -90,6 +117,13 @@ sunny-wechat-lite cron create "every 5m" \
 `--deliver` 投递到 `weixin:<chat_id>`。
 
 当前正式启用命令即为上面的 cron create 命令。
+
+说明：
+
+- wrapper 脚本不放在仓库中。
+- wrapper 脚本属于 Hermes profile 本地运行配置。
+- 不应提交 token，`chat_id` 应继续使用占位符。
+- 不同 profile 要放到各自 `~/.hermes/profiles/<profile>/scripts/` 目录。
 
 ## 正式启用链路
 

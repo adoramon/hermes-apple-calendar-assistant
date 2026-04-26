@@ -50,6 +50,9 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 33 v2.0-rc Hermes Cron Outbox Bridge 正式启用：
   reminder_worker launchd + Hermes Cron bridge + Hermes Cron Delivery 已作为
   当前真实微信提醒链路启用，`outbox_consumer` dry-run launchd 已暂停避免抢占
+- Phase 34 v2.0-rc Hermes Cron Bridge 脚本类型修正：
+  `cron --script` 应使用 profile/scripts 下的 Python wrapper
+  `calendar_outbox_bridge.py`，不能使用 `.sh` shell wrapper
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

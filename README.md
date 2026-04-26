@@ -84,7 +84,7 @@ APIs directly, and does not modify message content. See
 Phase 33 enablement update: the Hermes Cron Outbox Bridge path is now the
 active delivery path. `reminder_worker` launchd writes pending outbox messages,
 Hermes Cron job `calendar-outbox-wechat-bridge` reads them with
-profile script `~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.sh`,
+profile script `~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.py`,
 and Hermes Cron Delivery sends them through DeliveryRouter and the Weixin
 adapter. Different profiles should use their own `~/.hermes/profiles/<profile>/scripts/`
 directory rather than a global Hermes scripts directory. `outbox_consumer`
@@ -96,6 +96,13 @@ succeeded. See
 [docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md),
 [docs/hermes-profile-install.md](docs/hermes-profile-install.md), and
 [docs/v2-rc-local-dispatch-acceptance.md](docs/v2-rc-local-dispatch-acceptance.md).
+
+Phase 34 wrapper correction: Hermes `cron --script` in this setup reads Python
+scripts from the profile-specific directory, so the wrapper must be
+`calendar_outbox_bridge.py`, not a `.sh` shell wrapper. The wrapper is local
+Hermes profile runtime configuration, not part of this repository, and different
+profiles should keep their own wrapper under
+`~/.hermes/profiles/<profile>/scripts/`.
 
 ## Calendar Policy
 
