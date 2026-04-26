@@ -111,6 +111,14 @@ parsed into confirmation-required drafts. Replies such as `延后30分钟`, `取
 reschedule actions only execute after explicit confirmation. See
 [docs/reminder-action-flow.md](docs/reminder-action-flow.md).
 
+Phase 39 reminder action test update: Hermes WeChat interaction testing now
+uses `延后30分钟`, `取消这个日程`, and `改到明天上午10点` as acceptance replies. The
+expected behavior is always draft first, then explicit confirmation for delete
+or reschedule. If a WeChat reply does not produce a draft, check
+`~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log`,
+`~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`, and
+`python3 scripts/outbox.py list --limit 20`.
+
 ## Calendar Policy
 
 Read calendars:
@@ -243,6 +251,15 @@ Draft a reminder follow-up action:
 python3 scripts/reminder_action_flow.py draft --text "延后30分钟"
 python3 scripts/reminder_action_flow.py confirm --session-key "<session_key>"
 ```
+
+Hermes WeChat reminder follow-up test replies:
+
+- `延后30分钟`
+- `取消这个日程`
+- `改到明天上午10点`
+
+Expected behavior: generate a draft first; do not modify Calendar during draft;
+delete and reschedule require explicit second confirmation.
 
 Hermes local outbox CLI:
 
@@ -505,6 +522,8 @@ tail -n 100 logs/reminder_worker.out.log
 tail -n 100 logs/outbox_consumer.out.log
 python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
 python3 scripts/outbox.py list --limit 20
+tail -n 100 ~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log
+tail -n 100 ~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log
 python3 scripts/outbox_consumer.py dry-run --limit 10
 python3 scripts/flight_auto_enhancer.py run
 python3 -m unittest tests.test_flight_parser

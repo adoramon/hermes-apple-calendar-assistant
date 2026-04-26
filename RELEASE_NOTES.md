@@ -198,6 +198,19 @@ Apple Calendar
   `snooze`、`arrived`、`disable_reminder`、`change_offset` 本阶段先记录状态或偏好，
   不直接修改 Calendar 或全局提醒配置。
 
+### Phase 39 Reminder Follow-up WeChat Test Documentation
+
+- 已记录 Hermes 微信交互测试用例：
+  `延后30分钟`、`取消这个日程`、`改到明天上午10点`。
+- 已明确预期行为：
+  微信回复先进入 `reminder_action_flow.py draft --text "<用户原文>"` 生成操作草稿；
+  draft 阶段不直接修改 Calendar；
+  删除和改期必须等待二次确认后才可执行。
+- 已补充排查入口：
+  `~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log`、
+  `~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`、
+  `python3 scripts/outbox.py list --limit 20`。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

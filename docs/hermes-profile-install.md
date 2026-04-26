@@ -282,6 +282,32 @@ launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbo
 - 微信消息会带 `Cronjob Response` 包装
 - 初期建议 `limit=1`、`every 5m`
 
+## 微信提醒后续操作测试
+
+Phase 39 已记录 reminder action draft flow 的 Hermes 微信交互测试。用户收到日历
+提醒后，可在微信中回复：
+
+- `延后30分钟`
+- `取消这个日程`
+- `改到明天上午10点`
+
+预期行为：
+
+- Hermes 先调用项目脚本生成操作草稿：
+
+```bash
+python3 scripts/reminder_action_flow.py draft --text "延后30分钟"
+```
+
+- draft 阶段不直接修改 Calendar。
+- 删除和改期必须等待用户二次确认。
+
+如果微信回复没有生成草稿，优先排查：
+
+- `tail -n 100 ~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log`
+- `tail -n 100 ~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`
+- `python3 scripts/outbox.py list --limit 20`
+
 ## 验收与回滚
 
 完整验收清单见：

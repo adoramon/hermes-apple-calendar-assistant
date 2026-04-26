@@ -261,6 +261,24 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/remind
 - Calendar Skill 不读取微信 token，不直连微信 API，不请求外部网络。
 - 不删除 outbox，不修改 outbox message 内容。
 
+Hermes 微信交互实测用例：
+
+- `延后30分钟`
+- `取消这个日程`
+- `改到明天上午10点`
+
+预期行为：
+
+- 先调用 draft 命令生成操作草稿。
+- draft 阶段不直接修改 Calendar。
+- 删除和改期必须等待用户二次确认。
+
+如果微信回复没有触发草稿，优先排查：
+
+- `~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log`
+- `~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`
+- `python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/outbox.py list --limit 20`
+
 ## Hermes Cron Outbox Bridge
 
 当前仓库包含 Hermes Cron Outbox Bridge：

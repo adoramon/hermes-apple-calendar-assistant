@@ -55,6 +55,9 @@ Current version: `v2.0-rc local dispatch dry-run`
   `calendar_outbox_bridge.py`，不能使用 `.sh` shell wrapper
 - Phase 38 v2.0-rc 微信提醒交互式日程秘书：
   新增提醒后续操作解析、最近提醒上下文读取、确认式操作草稿与确认执行流程
+- Phase 39 v2.0-rc 微信提醒后续操作实测文档收口：
+  记录 Hermes 微信交互测试用例 `延后30分钟`、`取消这个日程`、
+  `改到明天上午10点`；明确先生成草稿，删除/改期必须二次确认
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha
