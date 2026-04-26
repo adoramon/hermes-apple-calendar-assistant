@@ -32,6 +32,9 @@ Current version: `v2.0-rc local dispatch dry-run`
   `real_send_gate`、blocked real mode、outbox audit/result、rollback docs
 - Phase 26 v2.0-rc 真实发送通道方案设计：
   推荐 Hermes 本地回调 / 本地 CLI，暂不选择 Telegram Bot API 或微信自动化
+- Phase 28 v2.0-rc Hermes WeChat dispatch capability discovery 文档化：
+  记录 profile 内存在 WeChat account/channel 线索，但当前仍禁止读取 token、
+  禁止直连 `ilinkai.weixin.qq.com`、禁止实现真实发送
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

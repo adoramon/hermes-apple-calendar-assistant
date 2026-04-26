@@ -42,6 +42,13 @@ introduce tokens, external network requests, or bypass Hermes scheduling and
 audit. See [docs/real-send-channel-options.md](docs/real-send-channel-options.md)
 and [docs/decision-records/ADR-001-real-send-channel.md](docs/decision-records/ADR-001-real-send-channel.md).
 
+Phase 28 discovery update: the Hermes profile contains WeChat account/config
+artifacts and a Weixin DM channel identifier, but this repository still must not
+read or copy profile tokens, must not call `ilinkai.weixin.qq.com`, and must not
+implement real WeChat sending until Hermes exposes a confirmed safe local
+dispatch interface. See [docs/wechat-dispatch-discovery.md](docs/wechat-dispatch-discovery.md)
+and [docs/decision-records/ADR-002-wechat-dispatch-discovery.md](docs/decision-records/ADR-002-wechat-dispatch-discovery.md).
+
 ## Calendar Policy
 
 Read calendars:

@@ -37,6 +37,25 @@ Apple Calendar
 - 实现前必须确认 Hermes local dispatch CLI、`sunny-wechat-lite` outbound
   API、profile 内部 tool 和用户二次确认策略。
 
+### Phase 28 WeChat Dispatch Capability Discovery
+
+- 新增 discovery 文档：`docs/wechat-dispatch-discovery.md`。
+- 新增 ADR：`docs/decision-records/ADR-002-wechat-dispatch-discovery.md`。
+- 已记录只读发现：
+  `sunny-wechat-lite` profile 下存在 `weixin/accounts/*.json`；
+  account JSON 包含 `base_url`、`user_id`、`token`；
+  `channel_directory.json` 中存在 Weixin DM channel。
+- 文档明确：不把 token 写入本项目，不读取或复制 profile token。
+- 文档明确：不实现直接请求 `ilinkai.weixin.qq.com` 的发送逻辑。
+- 文档明确：直接请求 WeChat API 会绕过 Hermes 的权限、审计和统一调度边界。
+- 文档明确：尚未确认 Hermes 官方/本地安全 dispatch 接口，因此当前不能实现
+  WeChat 真实发送。
+- 当前推荐链路继续保持：
+  `reminder_worker -> outbox -> outbox_consumer -> dry-run`。
+- 下一步建议：
+  继续探查 Hermes Python 包中的正式 send/dispatch 函数，或通过 Hermes 自身
+  webhook/cron 机制唤醒 profile 读取 outbox。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、
