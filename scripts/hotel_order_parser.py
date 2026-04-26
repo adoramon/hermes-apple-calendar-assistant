@@ -6,12 +6,14 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from typing import Any
 
 
 HOTEL_HINTS = ("酒店", "入住", "离店", "退房", "房型", "订单号", "确认号", "预订", "民宿")
 PLATFORMS = ("携程", "美团", "飞猪", "Booking", "Agoda", "Airbnb", "Expedia", "Trip.com")
 DATE_RE = re.compile(r"(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})日?")
+DATE_NO_YEAR_RE = re.compile(r"(?<!\d)(\d{1,2})月(\d{1,2})日")
 TIME_RE = re.compile(r"(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)")
 
 
@@ -27,6 +29,10 @@ def _clean(value: Any) -> str:
 
 def _date_iso(match: re.Match[str]) -> str:
     return f"{int(match.group(1)):04d}-{int(match.group(2)):02d}-{int(match.group(3)):02d}"
+
+
+def _date_iso_no_year(match: re.Match[str]) -> str:
+    return f"{datetime.now().year:04d}-{int(match.group(1)):02d}-{int(match.group(2)):02d}"
 
 
 def _find_after_label(text: str, labels: tuple[str, ...], stop_words: tuple[str, ...], max_len: int = 60) -> str:
@@ -50,6 +56,8 @@ def _find_dates(text: str) -> tuple[str | None, str | None]:
     if checkin and checkout:
         return checkin, checkout
     dates = [_date_iso(match) for match in DATE_RE.finditer(text)]
+    if not dates:
+        dates = [_date_iso_no_year(match) for match in DATE_NO_YEAR_RE.finditer(text)]
     if not checkin and dates:
         checkin = dates[0]
     if not checkout and len(dates) > 1:
@@ -60,9 +68,17 @@ def _find_dates(text: str) -> tuple[str | None, str | None]:
 def _find_time_near(text: str, labels: tuple[str, ...]) -> str | None:
     label_pattern = "|".join(re.escape(label) for label in labels)
     match = re.search(rf"(?:{label_pattern})\s*(?:时间)?\s*[:：]?\s*{TIME_RE.pattern}", text)
-    if not match:
+    if match:
+        return f"{int(match.group(1)):02d}:{int(match.group(2)):02d}"
+    label_match = re.search(rf"(?:{label_pattern})\s*(?:时间)?\s*[:：]?", text)
+    if not label_match:
         return None
-    return f"{int(match.group(1)):02d}:{int(match.group(2)):02d}"
+    # Hotel screenshots often say "入住 2026-04-27 23:30" or "预计到店 23:00".
+    nearby = text[label_match.end() : label_match.end() + 48]
+    time_match = TIME_RE.search(nearby)
+    if not time_match:
+        return None
+    return f"{int(time_match.group(1)):02d}:{int(time_match.group(2)):02d}"
 
 
 def _find_platform(text: str) -> str:
@@ -81,9 +97,14 @@ def _find_hotel_name(text: str) -> str:
     )
     if explicit:
         explicit = re.sub(r"^(订单|预订|确认单|预订单)\s*", "", explicit).strip()
+        if explicit.startswith(("入住", "离店", "退房", "预计到店")):
+            explicit = ""
         if explicit and explicit not in {"订单", "预订"}:
             return explicit
     match = re.search(r"(?:订单|预订)\s+([^\s，,。；;]{2,40}(?:酒店|宾馆|民宿|度假村|公寓|客栈|Banyan Tree|Hotel))", text, re.I)
+    if match:
+        return _clean(match.group(1))
+    match = re.search(r"([^\s，,。；;]{2,60}(?:酒店|宾馆|民宿|度假村|公寓|客栈|Banyan Tree|Hotel))\s+(?:入住|离店|退房|地址)", text, re.I)
     return _clean(match.group(1)) if match else ""
 
 
@@ -120,7 +141,7 @@ def parse_order_text(text: str) -> dict[str, Any]:
         ("平台", "房型", "入住人", "地址", "入住", "离店"),
         max_len=40,
     )
-    checkin_time = _find_time_near(normalized, ("入住时间", "到店时间", "入住"))
+    checkin_time = _find_time_near(normalized, ("入住时间", "到店时间", "预计到店", "到店", "入住"))
     checkout_time = _find_time_near(normalized, ("离店时间", "退房时间", "退房", "离店"))
 
     missing_fields = ["calendar"]

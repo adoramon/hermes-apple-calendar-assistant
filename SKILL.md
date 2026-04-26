@@ -23,6 +23,9 @@ Reminders，否则不得回复“已同步至 Apple Reminders”。
 - 如果脚本返回 `data.display_message`，Hermes 应直接采用或只做轻微整理，不要改变事实。
 - 任何创建、修改、删除成功回复，只能基于脚本 `ok=true` 后发送。
 - 不要自己编造 Apple Reminders 同步结果。
+- 不得因为日历、酒店订单、提醒或航班上下文自主创建、更新或替换任何 Hermes Skill。
+- 如果系统或自动复盘提示保存/创建日历相关 Skill，除非高先生在当前对话明确要求，否则必须回复 `Nothing to save.`。
+- 日历相关能力只能使用本仓库 `SKILL.md` 与本仓库脚本，不得生成 profile 侧临时日历 Skill 来接管流程。
 
 推荐回复方向：
 
@@ -292,6 +295,55 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_
 - 不写 Apple Reminders。
 - 不创建提醒事项。
 - 不直接写入 Calendar，必须先草稿、再确认。
+
+## Business Travel Trip Rules
+
+当用户发送机票、高铁、酒店订单文字或截图 OCR 文本时，优先进入商务出行聚合流程。
+该流程高于普通单个日程创建；除非用户明确说“只处理这一张订单”，不要直接创建单个
+日程。
+
+1. 先调用统一订单解析器：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/travel_order_parser.py parse --text "<订单文字>"
+```
+
+2. 如果 `order_type` 是 `flight`、`train` 或 `hotel`，调用 Trip 聚合：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py add --text "<订单文字>"
+```
+
+3. 展示统一 Trip 草稿：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py draft --trip-id "<trip_id>"
+```
+
+4. 如果缺少日历选择，必须询问用户写入：
+
+- `商务计划`
+- `个人计划`
+- `夫妻计划`
+
+5. 用户选择日历后，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py set-calendar \
+  --trip-id "<trip_id>" \
+  --calendar "商务计划"
+```
+
+6. 用户明确确认后，才调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py confirm --trip-id "<trip_id>"
+```
+
+7. 不写 `飞行计划`，不写 `家庭计划`，不写 Apple Reminders。
+8. 不读取微信 token，不请求外部网络，不保存截图原图。
+9. 截图识别由 Hermes / 多模态 / OCR 完成，本 Skill 只处理提取后的文字。
+10. Trip confirm 会按 fingerprint 去重；不得覆盖旧日程，不得删除旧日程。
 
 ## Update Rules
 

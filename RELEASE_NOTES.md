@@ -281,6 +281,34 @@ Apple Calendar
   不写 Apple Reminders；
   不直接写 Calendar，必须先草稿、再确认。
 
+### Phase 44 sunny-wechat-lite Skill Governance Hardening
+
+- 明确 `sunny-wechat-lite` 在日历、酒店订单、提醒和航班相关对话中不得自主创建、
+  更新或替换 Hermes Skill。
+- 自动复盘或保存经验提示如果要求创建日历相关 Skill，必须回复 `Nothing to save.`，
+  除非高先生在当前对话明确要求创建或修改 Skill。
+- 日历能力只能路由到本仓库 `SKILL.md` 与本仓库脚本，避免 profile 侧临时 Skill
+  接管酒店订单、Apple Calendar 或 Apple Reminders 流程。
+
+### Phase 45 Pro Business Travel Secretary System
+
+- 新增 `scripts/travel_order_parser.py`：
+  统一识别机票、高铁和酒店订单文字，输出 `order_type`、平台、hash、字段和缺失字段。
+- 新增 `scripts/trip_aggregator.py`：
+  将连续发送的交通/酒店订单按目的地城市和日期窗口聚合进 `data/trip_drafts.json`。
+- 新增 `scripts/trip_flow.py`：
+  生成统一 Trip 行程草稿，支持 `set-calendar`、`confirm`、`cancel`。
+- 新增 `data/trip_seen.json`：
+  confirm 时按 `event_type + title + start + end + confirmation_number` 生成
+  fingerprint，已见事件跳过，避免重复创建。
+- `assistant_persona.py` 新增 Trip 文案函数：
+  `format_trip_draft`、`format_trip_confirmed`、`format_trip_missing_fields`、
+  `format_trip_duplicate_warning`。
+- 安全边界：
+  Trip draft/add 阶段不写 Calendar；
+  confirm 前必须选择 `商务计划`、`个人计划` 或 `夫妻计划`；
+  不写 `飞行计划`、不写 Apple Reminders、不请求外部网络、不保存截图原图。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：

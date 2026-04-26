@@ -81,6 +81,14 @@ Current version: `v2.0-rc local dispatch dry-run`
   `hotel_order_flow.py draft`，缺少字段时继续追问 `个人计划` / `夫妻计划`
   和入住时间，用户确认后才调用 `hotel_order_flow.py confirm` 写入 Apple
   Calendar；日志关键字为 `draft`、`update-draft`、`confirm`
+- Phase 44 补充：sunny-wechat-lite Skill 自主创建治理：
+  明确微信侧日历、酒店订单、提醒和航班上下文不得触发 Hermes 自主创建或替换
+  日历相关 Skill；自动保存/创建 Skill 提示应回复 `Nothing to save.`，除非高先生
+  当前对话明确要求
+- Phase 45 Pro 商务出行自动秘书系统：
+  新增 `travel_order_parser.py`、`trip_aggregator.py`、`trip_flow.py`，
+  支持机票/酒店/高铁订单聚合为一次 Trip，确认日历后一次性写入 Apple Calendar，
+  并通过 `trip_seen.json` 做事件 fingerprint 去重
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

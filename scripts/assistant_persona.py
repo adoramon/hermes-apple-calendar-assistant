@@ -301,3 +301,126 @@ def format_hotel_order_draft(order: dict[str, Any], missing_fields: list[str] | 
     else:
         lines.extend(["", "您确认后我再写入 Apple Calendar。"])
     return "\n".join(lines)
+
+
+def _format_trip_date(value: Any) -> str:
+    parsed = parse_datetime(value)
+    if parsed is None:
+        text = clean_text(value)
+        try:
+            parsed = datetime.fromisoformat(text + "T00:00:00")
+        except ValueError:
+            return text
+    return f"{parsed.month}月{parsed.day}日"
+
+
+def _trip_event_icon(event: dict[str, Any]) -> str:
+    event_type = clean_text(event.get("event_type"))
+    if event_type == "flight":
+        return "✈️"
+    if event_type == "train":
+        return "🚄"
+    if event_type == "hotel":
+        return "🏨"
+    return "📌"
+
+
+def _format_trip_event_line(event: dict[str, Any]) -> list[str]:
+    icon = _trip_event_icon(event)
+    title = clean_text(event.get("title"))
+    lines = [f"{icon} {format_time_range(event.get('start'), event.get('end'))}"]
+    if title:
+        lines.append(f"   {title}")
+    location = clean_text(event.get("location"))
+    if location:
+        lines.append(f"   📍 {location}")
+    return lines
+
+
+def format_trip_draft(trip: dict[str, Any]) -> str:
+    """Format an aggregated business travel draft."""
+    events = [event for event in trip.get("events", []) if isinstance(event, dict)]
+    destination = clean_text(trip.get("destination_city")) or "这次"
+    start = _format_trip_date(trip.get("start_date"))
+    end = _format_trip_date(trip.get("end_date"))
+    lines = [
+        "高先生，我把这几条订单整理成一次完整出行了 ✈️🏨",
+        "",
+        f"📍 目的地：{destination}",
+        f"📅 时间：{start} - {end}",
+        "",
+        "行程如下：",
+        "",
+    ]
+    if events:
+        for index, event in enumerate(events, start=1):
+            event_lines = _format_trip_event_line(event)
+            lines.append(f"{index}. {event_lines[0]}")
+            lines.extend(event_lines[1:])
+            if index != len(events):
+                lines.append("")
+    else:
+        lines.append("我还没整理出可写入的行程事件，需要再看一下订单文字。")
+
+    missing = set(trip.get("missing_fields") or [])
+    if "calendar" in missing or not trip.get("calendar"):
+        suggested = clean_text(trip.get("suggested_calendar"))
+        lines.extend(
+            [
+                "",
+                "请您确认写入哪个日历：",
+                "- 商务计划",
+                "- 个人计划",
+                "- 夫妻计划",
+            ]
+        )
+        if suggested:
+            lines.extend(["", f"我这边建议先放到「{suggested}」，但最终听您的。"])
+        lines.extend(["", "确认后，我一次性帮您写入 Apple Calendar。"])
+    else:
+        lines.extend(["", f"📅 日历：{clean_text(trip.get('calendar'))}", "您确认后，我一次性帮您写入 Apple Calendar。"])
+    return "\n".join(lines)
+
+
+def format_trip_confirmed(trip: dict[str, Any], results: list[dict[str, Any]]) -> str:
+    """Format confirmed trip write results."""
+    created = [item for item in results if item.get("status") == "created"]
+    skipped = [item for item in results if item.get("status") == "skipped_duplicate"]
+    failed = [item for item in results if item.get("status") == "failed"]
+    lines = ["高先生，这次出行我已经替您整理进 Apple Calendar 了 ✨", ""]
+    if created:
+        lines.append(f"已新增 {len(created)} 条日程。")
+    if skipped:
+        lines.append(f"有 {len(skipped)} 条之前已经写过，我就没重复创建。")
+    if failed:
+        lines.append(f"有 {len(failed)} 条没写成功，我先帮您标出来。")
+    calendar = clean_text(trip.get("calendar"))
+    if calendar:
+        lines.append(f"📅 日历：{calendar}")
+    lines.extend(["", "我会帮您把交通和酒店时间一起盯住。"])
+    return "\n".join(lines)
+
+
+def format_trip_missing_fields(trip: dict[str, Any]) -> str:
+    """Format missing field prompt for trip drafts."""
+    missing = set(trip.get("missing_fields") or [])
+    if "calendar" in missing or not trip.get("calendar"):
+        return "\n".join(
+            [
+                "高先生，这次出行草稿我已经整理好啦。",
+                "",
+                "写入前您选一下日历：商务计划、个人计划，还是夫妻计划？",
+            ]
+        )
+    return "高先生，这次出行草稿还差一点信息，我再帮您补齐。"
+
+
+def format_trip_duplicate_warning(trip: dict[str, Any]) -> str:
+    """Format duplicate warning for trip writes."""
+    return "\n".join(
+        [
+            "高先生，这次出行里有日程之前已经写过了。",
+            "",
+            "我不会重复创建，也不会覆盖旧日程，稳一点更好。✨",
+        ]
+    )

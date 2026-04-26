@@ -168,6 +168,23 @@ is wrong and should be debugged through the profile logs. The flow still must
 not write `商务计划`, `家庭计划`, `飞行计划`, or Apple Reminders, and must not write
 Calendar before confirmation.
 
+Hermes profile governance: `sunny-wechat-lite` must not autonomously create,
+update, or replace calendar-related Skills from conversation summaries. Calendar,
+hotel order, reminder, and flight-plan conversations must route through this
+repository Skill and scripts. If an automatic skill-save prompt appears, the
+expected response is `Nothing to save.` unless 高先生 explicitly asks to create
+or update a Skill in the current conversation.
+
+Phase 45 Pro business travel secretary update: copied or OCR-extracted flight,
+hotel, and train order text can now be parsed by `travel_order_parser.py`,
+collected by `trip_aggregator.py`, and drafted by `trip_flow.py` as one
+combined Trip. The user must choose `商务计划`, `个人计划`, or `夫妻计划`; only
+`trip_flow.py confirm` writes Apple Calendar events, and duplicate fingerprints
+in `data/trip_seen.json` are skipped instead of overwritten. This flow does not
+write `飞行计划`, does not operate Apple Reminders, does not request the network,
+and does not save screenshot images. See [docs/trip-aggregator.md](docs/trip-aggregator.md)
+and [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
+
 ## Calendar Policy
 
 Read calendars:
