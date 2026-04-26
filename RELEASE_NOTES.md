@@ -211,6 +211,41 @@ Apple Calendar
   `~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`、
   `python3 scripts/outbox.py list --limit 20`。
 
+### Calendar Event Query Bugfix
+
+- 修复提醒实测中发现的 Calendar 事件读取问题：
+  `个人计划` 中存在 `再次测试 / 2026-04-26 13:00`，但旧查询路径没有生成提醒。
+- 根因包括：
+  Calendar AppleScript 时间窗口过滤需要使用 `whose its start date/end date`；
+  旧变量名容易与 Calendar AppleScript 术语冲突；
+  多行地点或备注会破坏以换行分隔的事件输出；
+  stdout `.strip()` 会丢失 tab 分隔输出中的空尾字段。
+- `scripts/calendar_ops.py` 已修复：
+  使用验证过的时间过滤语法；
+  清洗字段中的 tab/换行/return；
+  将 `missing value` 归一为空字符串；
+  保留 tab 分隔中的空字段。
+- 已新增文档：`docs/calendar-event-query-bugfix.md`。
+
+### Phase 40 Reminder Copy And Hermes Behavior Constraints
+
+- `scripts/hermes_cron_outbox_bridge.py` 的提醒正文已优化为更自然的中文个人助理
+  文案，适当使用 emoji，并展示时间、事项、地点和可直接回复的操作。
+- 多条提醒会汇总为“您有 N 个即将开始的日程”，不输出 JSON、fingerprint 或
+  outbox id；地点为空时不显示地点行。
+- Hermes 微信后续操作规则已收紧：
+  用户回复 `推迟30分钟`、`延后30分钟`、`稍后提醒`、`取消这个日程`、
+  `改到明天上午10点`、`已到达`、`不再提醒` 时，必须优先调用
+  `reminder_action_flow.py draft --text "<用户原文>"`。
+- 如果 draft flow 能找到最近提醒，Hermes 不应先追问“是哪个日程”；只有没有最近
+  提醒或返回多个候选时才询问用户选择。
+- 明确禁止错误表述：
+  本项目操作 Apple Calendar，不操作 Apple Reminders；
+  不得回复“已同步至 Apple Reminders”。
+- 推荐回复：
+  draft 后说“已生成操作草稿，尚未修改日程。”；
+  confirm 成功后说“已更新 Apple Calendar 日程。”。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

@@ -240,13 +240,16 @@ Outbox 安全边界：
 
 ## Reminder Follow-up Actions
 
-当用户在收到日历提醒后回复“延后30分钟”“延后1小时”“取消这个日程”“改到明天上午10点”“已到达”“不再提醒”“提前30分钟提醒我”等后续操作时，先调用：
+当用户在收到日历提醒后回复“推迟30分钟”“延后30分钟”“延后1小时”“稍后提醒”“取消这个日程”“改到明天上午10点”“已到达”“不再提醒”“提前30分钟提醒我”等后续操作时，必须优先调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/reminder_action_flow.py draft --text "<用户原文>"
 ```
 
-Hermes 必须展示返回的草稿摘要和目标日程。只有用户明确确认后，才调用：
+如果 `reminder_action_flow.py` 能找到最近提醒，Hermes 不得先追问“是哪个日程”。
+只有当 draft 返回多个候选或没有最近提醒时，才询问用户选择。
+
+Hermes 必须展示返回的草稿摘要和目标日程，并明确说明“已生成操作草稿，尚未修改日程”。只有用户明确确认后，才调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/reminder_action_flow.py confirm --session-key "<session_key>"
@@ -260,9 +263,25 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/remind
 - `snooze`、`arrived`、`disable_reminder`、`change_offset` 当前只记录状态或偏好，不直接修改 Calendar。
 - Calendar Skill 不读取微信 token，不直连微信 API，不请求外部网络。
 - 不删除 outbox，不修改 outbox message 内容。
+- 本项目操作 Apple Calendar。
+- 本项目不操作 Apple Reminders。
+- 不得回复“已同步至 Apple Reminders”。
+- 如果只是生成草稿，应回复：“已生成操作草稿，尚未修改日程。”
+- 如果 confirm 成功修改了日程，应回复：“已更新 Apple Calendar 日程。”
+
+确认成功后的推荐回复格式：
+
+```text
+已更新 Apple Calendar 日程：
+
+📌 事项：再次测试
+🕐 新时间：今天 13:30-14:30
+📅 日历：个人计划
+```
 
 Hermes 微信交互实测用例：
 
+- `推迟30分钟`
 - `延后30分钟`
 - `取消这个日程`
 - `改到明天上午10点`

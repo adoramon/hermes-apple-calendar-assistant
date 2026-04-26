@@ -104,7 +104,9 @@ def _run_osascript(script: str) -> tuple[bool, str, str | None]:
     except Exception as exc:  # Defensive boundary for CLI/Hermes callers.
         return False, "", f"osascript failed: {exc}"
 
-    stdout = completed.stdout.strip()
+    # Preserve tabs and spaces because Calendar rows use tab-delimited fields;
+    # empty trailing fields (for example no location/notes) are meaningful.
+    stdout = completed.stdout.rstrip("\r\n")
     stderr = completed.stderr.strip()
     if completed.returncode != 0:
         return False, stdout, stderr or f"osascript exited with {completed.returncode}"
@@ -156,33 +158,49 @@ def list_events(
 
     calendar_name_escaped = _escape_applescript_text(calendar_name)
     prelude: list[str] = []
-    prelude.append(_apple_date_assignment("startDate", start))
-    prelude.append(_apple_date_assignment("endDate", end))
-    # Include any event that overlaps the requested window.
+    prelude.append(_apple_date_assignment("windowStart", start))
+    prelude.append(_apple_date_assignment("windowEnd", end))
+    # Include any event that overlaps the requested window. Calendar.app's
+    # AppleScript dictionary requires "its" for date properties in whose filters.
     event_query = (
-        "every event of targetCalendar whose end date is greater than startDate "
-        "and its start date is less than endDate"
+        "every event of targetCalendar whose its end date is greater than windowStart "
+        "and its start date is less than windowEnd"
     )
-
     script = f"""
+on cleanField(rawValue)
+    set cleanedText to ""
+    try
+        set cleanedText to rawValue as text
+    end try
+    if cleanedText is "missing value" then
+        set cleanedText to ""
+    end if
+    set AppleScript's text item delimiters to {{tab, linefeed, return}}
+    set cleanedParts to text items of cleanedText
+    set AppleScript's text item delimiters to " "
+    set cleanedText to cleanedParts as text
+    set AppleScript's text item delimiters to ""
+    return cleanedText
+end cleanField
+
 {chr(10).join(prelude)}
 tell application "Calendar"
     set targetCalendar to calendar "{calendar_name_escaped}"
     set matchingEvents to ({event_query})
     set output to ""
     repeat with ev in matchingEvents
-        set eventTitle to summary of ev as text
-        set eventStart to (start date of ev) as text
-        set eventEnd to (end date of ev) as text
-        set eventLocation to ""
-        set eventNotes to ""
+        set f1 to my cleanField(summary of ev)
+        set f2 to my cleanField(start date of ev)
+        set f3 to my cleanField(end date of ev)
+        set f4 to ""
+        set f5 to ""
         try
-            set eventLocation to location of ev as text
+            set f4 to my cleanField(location of ev)
         end try
         try
-            set eventNotes to description of ev as text
+            set f5 to my cleanField(description of ev)
         end try
-        set output to output & eventTitle & tab & eventStart & tab & eventEnd & tab & eventLocation & tab & eventNotes & linefeed
+        set output to output & f1 & tab & f2 & tab & f3 & tab & f4 & tab & f5 & linefeed
     end repeat
     return output
 end tell
@@ -235,11 +253,11 @@ def create_event(
     notes_escaped = _escape_applescript_text(notes)
 
     script = f"""
-{_apple_date_assignment("startDate", start)}
-{_apple_date_assignment("endDate", end)}
+{_apple_date_assignment("eventStartValue", start)}
+{_apple_date_assignment("eventEndValue", end)}
 tell application "Calendar"
     set targetCalendar to calendar "{calendar_name_escaped}"
-    set newEvent to make new event at end of events of targetCalendar with properties {{summary:"{title_escaped}", start date:startDate, end date:endDate, location:"{location_escaped}", description:"{notes_escaped}"}}
+    set newEvent to make new event at end of events of targetCalendar with properties {{summary:"{title_escaped}", start date:eventStartValue, end date:eventEndValue, location:"{location_escaped}", description:"{notes_escaped}"}}
     return uid of newEvent
 end tell
 """.strip()
@@ -287,12 +305,12 @@ def update_event(
         update_lines.append(f'set summary of targetEvent to "{new_title_escaped}"')
         updated_fields.append("title")
     if start is not None:
-        prelude.append(_apple_date_assignment("newStartDate", start))
-        update_lines.append("set start date of targetEvent to newStartDate")
+        prelude.append(_apple_date_assignment("updatedStartValue", start))
+        update_lines.append("set start date of targetEvent to updatedStartValue")
         updated_fields.append("start")
     if end is not None:
-        prelude.append(_apple_date_assignment("newEndDate", end))
-        update_lines.append("set end date of targetEvent to newEndDate")
+        prelude.append(_apple_date_assignment("updatedEndValue", end))
+        update_lines.append("set end date of targetEvent to updatedEndValue")
         updated_fields.append("end")
     if location is not None:
         location_escaped = _escape_applescript_text(location)
@@ -365,9 +383,9 @@ tell application "Calendar"
     set matchedCount to 0
     set targetEvent to missing value
     repeat with ev in matches
-        set eventStartText to (start date of ev) as text
-        set eventEndText to (end date of ev) as text
-        if eventStartText is "{start_text_escaped}" and eventEndText is "{end_text_escaped}" then
+        set f2 to (start date of ev) as text
+        set f3 to (end date of ev) as text
+        if f2 is "{start_text_escaped}" and f3 is "{end_text_escaped}" then
             set matchedCount to matchedCount + 1
             set targetEvent to ev
         end if

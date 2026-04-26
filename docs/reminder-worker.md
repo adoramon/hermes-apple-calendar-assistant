@@ -1,5 +1,11 @@
 # Reminder Worker
 
+事件读取依赖 `scripts/calendar_ops.py events`。提醒实测中曾发现一个 Calendar 查询
+Bug：Calendar.app 中存在 `个人计划 / 再次测试 / 2026-04-26 13:00`，但因
+AppleScript 时间过滤、多行地点和空字段解析问题，旧查询路径没有把该事件交给
+`reminder_worker.py`。修复记录见
+[`docs/calendar-event-query-bugfix.md`](calendar-event-query-bugfix.md)。
+
 `scripts/reminder_worker.py` scans upcoming Calendar.app events and emits JSON
 reminder candidates. It does not send WeChat, Telegram, system notifications, or
 Calendar alarms.

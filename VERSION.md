@@ -58,6 +58,12 @@ Current version: `v2.0-rc local dispatch dry-run`
 - Phase 39 v2.0-rc 微信提醒后续操作实测文档收口：
   记录 Hermes 微信交互测试用例 `延后30分钟`、`取消这个日程`、
   `改到明天上午10点`；明确先生成草稿，删除/改期必须二次确认
+- v2.0-rc Calendar event query bugfix：
+  修复 `calendar_ops.py events` 对 Calendar AppleScript 时间过滤、多行地点/备注、
+  空字段解析的兼容问题，避免日历中存在的事件被提醒扫描漏掉
+- Phase 40 v2.0-rc 提醒文案优化与 Hermes 行为约束修正：
+  Hermes Cron bridge 输出个人助理式中文提醒；微信后续回复优先进入 draft；
+  明确项目操作 Apple Calendar，禁止误称同步到 Apple Reminders
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

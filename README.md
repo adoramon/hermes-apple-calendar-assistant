@@ -119,6 +119,23 @@ or reschedule. If a WeChat reply does not produce a draft, check
 `~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`, and
 `python3 scripts/outbox.py list --limit 20`.
 
+Phase 40 reminder copy and behavior update: the Hermes Cron outbox bridge now
+renders WeChat reminders as natural Chinese assistant messages with light emoji,
+for example `📅 日程提醒` plus time, title, and location. Hermes must call
+`reminder_action_flow.py draft --text "<用户原文>"` first for replies like
+`推迟30分钟`, `取消这个日程`, or `改到明天上午10点` when a recent reminder exists, and
+must not ask which event unless the draft flow returns no context or multiple
+candidates. This project operates Apple Calendar, not Apple Reminders; responses
+must not say `已同步至 Apple Reminders`.
+
+Calendar event query bugfix update: reminder testing found that an event could
+exist in Calendar.app but be dropped by `calendar_ops.py events` when its
+location or notes contained line breaks, or when AppleScript date-property
+filters were parsed differently by Calendar.app. The query path now preserves
+tab-delimited empty fields, cleans multi-line fields, and uses the verified
+`whose its start date/end date` syntax. See
+[docs/calendar-event-query-bugfix.md](docs/calendar-event-query-bugfix.md).
+
 ## Calendar Policy
 
 Read calendars:
@@ -248,18 +265,23 @@ python3 scripts/outbox_consumer.py dry-run --limit 10
 Draft a reminder follow-up action:
 
 ```bash
+python3 scripts/reminder_action_flow.py draft --text "推迟30分钟"
 python3 scripts/reminder_action_flow.py draft --text "延后30分钟"
 python3 scripts/reminder_action_flow.py confirm --session-key "<session_key>"
 ```
 
 Hermes WeChat reminder follow-up test replies:
 
+- `推迟30分钟`
 - `延后30分钟`
 - `取消这个日程`
 - `改到明天上午10点`
 
 Expected behavior: generate a draft first; do not modify Calendar during draft;
-delete and reschedule require explicit second confirmation.
+delete and reschedule require explicit second confirmation. If draft succeeds,
+do not ask which event. Draft replies should say `已生成操作草稿，尚未修改日程。`;
+successful Calendar changes should say `已更新 Apple Calendar 日程。` Never mention
+Apple Reminders unless a future implementation explicitly writes to it.
 
 Hermes local outbox CLI:
 
