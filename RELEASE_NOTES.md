@@ -56,6 +56,31 @@ Apple Calendar
   继续探查 Hermes Python 包中的正式 send/dispatch 函数，或通过 Hermes 自身
   webhook/cron 机制唤醒 profile 读取 outbox。
 
+### Phase 29 Hermes DeliveryRouter Technical Research
+
+- 新增预研文档：`docs/hermes-delivery-router-research.md`。
+- 新增 ADR：`docs/decision-records/ADR-003-hermes-delivery-router.md`。
+- 已记录 Hermes 内部结构发现：
+  `gateway.delivery.DeliveryRouter`、
+  `DeliveryTarget.parse("weixin:<chat_id>")`、
+  `deliver(content, targets, metadata)`、
+  `_deliver_to_platform -> adapter.send(...)`。
+- 已记录 gateway runtime 约束：
+  `gateway/run.py` 会把 live adapters 注入 `delivery_router.adapters`。
+- 文档明确：独立 Skill 脚本当前无法获得 live adapters，因此不能直接调用真实发送。
+- 文档明确：本项目不能读取 profile token，不能复制 Weixin adapter 初始化逻辑，
+  也不能绕过 Hermes gateway 的权限和审计。
+- 当前推荐路线：
+  优先让 Hermes gateway/cron 原生调用 `DeliveryRouter` 发送 outbox；
+  次选由 Hermes profile 内部 webhook/cron job 读取 outbox 后再调用 gateway
+  delivery；
+  不推荐 Calendar Skill 直接读取 `weixin/accounts` token 并调用 ilink API。
+- 当前 dry-run 链路继续保持：
+  `reminder_worker -> outbox -> outbox_consumer -> channel_sender -> hermes_dispatcher dry-run`。
+- Phase 30 建议：
+  探查 hermes cron 是否支持 delivery targets，并尝试用 hermes cron/webhook
+  触发“读取 outbox 并回复到 weixin home channel”。
+
 ## v2.0-beta Dry-run Accepted
 
 当前状态是 `v2.0-beta dry-run accepted`。v2.0-beta 在提醒候选扫描基础上，补齐了本地 outbound message、outbox 队列、

@@ -25,6 +25,14 @@
 - 需要确认 `sunny-wechat-lite` 是否有 outbound message API。
 - 需要确认 profile 内部是否需要新增 tool 或 handler。
 
+Phase 29 补充结论：
+
+- Hermes 内部已发现 `gateway.delivery.DeliveryRouter`。
+- `DeliveryRouter` 真实发送依赖 gateway runtime 注入的 live adapters。
+- 独立 Skill 脚本无法直接安全复用该 runtime。
+- 因此推荐把真实发送继续放在 Hermes gateway / cron / profile-internal webhook
+  中实现，而不是放在 calendar assistant 内。
+
 ## 方案 B：Telegram Bot API
 
 calendar assistant 直接调用 Telegram Bot API 发送提醒。
@@ -57,6 +65,8 @@ calendar assistant 直接调用 Telegram Bot API 发送提醒。
 - 本地微信自动化链路复杂且脆弱。
 - 真实发送、重试、撤回、账号状态和窗口焦点都可能带来不可控副作用。
 - 如果 calendar assistant 直接驱动微信，会绕过 Hermes profile 的统一策略。
+- 如果 calendar assistant 直接读取 `weixin/accounts` token 或复制 Weixin
+  adapter 初始化逻辑，也会绕过 Hermes gateway 的权限和审计。
 
 当前结论：暂不选择。
 
@@ -80,5 +90,6 @@ calendar assistant 直接调用 Telegram Bot API 发送提醒。
 - 是否需要用户二次确认。
 - Hermes 如何记录发送审计和失败原因。
 - Hermes 如何处理重复消息、撤回和紧急停用。
+- Hermes cron / webhook 是否可在 runtime 内直接使用 delivery targets。
 
 在以上问题确认前，保持 `real_send_enabled=false`，不要启用真实发送。

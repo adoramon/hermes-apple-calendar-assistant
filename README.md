@@ -49,6 +49,15 @@ implement real WeChat sending until Hermes exposes a confirmed safe local
 dispatch interface. See [docs/wechat-dispatch-discovery.md](docs/wechat-dispatch-discovery.md)
 and [docs/decision-records/ADR-002-wechat-dispatch-discovery.md](docs/decision-records/ADR-002-wechat-dispatch-discovery.md).
 
+Phase 29 technical research update: Hermes source contains
+`gateway.delivery.DeliveryRouter`, but real delivery depends on gateway runtime
+live adapters injected by `gateway/run.py`. Because this repository is an
+independent Skill script, it still must not try to call real send directly,
+must not replicate Weixin adapter initialization, and must not bypass Hermes
+gateway permission and audit boundaries. See
+[docs/hermes-delivery-router-research.md](docs/hermes-delivery-router-research.md)
+and [docs/decision-records/ADR-003-hermes-delivery-router.md](docs/decision-records/ADR-003-hermes-delivery-router.md).
+
 ## Calendar Policy
 
 Read calendars:
