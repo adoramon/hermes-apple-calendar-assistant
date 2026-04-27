@@ -224,6 +224,16 @@ Reminders, and must not skip confirmation. See
 [docs/travel-intent-wechat-validation.md](docs/travel-intent-wechat-validation.md)
 and [docs/travel-intent-planner.md](docs/travel-intent-planner.md).
 
+Phase 49 flight-plan merge update: Trip planning now treats Apple Calendar
+`飞行计划` as the protected source of truth for flights. `flight_plan_reader.py`
+reads future `飞行计划` events, `trip_flight_matcher.py` links matching outbound
+and return flights into Trip drafts as read-only `linked_flights`, and
+`trip_flow.py` excludes those flights from events written to
+`商务计划` / `个人计划` / `夫妻计划`. Flight screenshots are only matching hints and
+must not create duplicate flight events. Hotels, trains, and customer visits
+remain confirmable writes to the selected normal calendar. See
+[docs/trip-flight-plan-merge.md](docs/trip-flight-plan-merge.md).
+
 ## Calendar Policy
 
 Read calendars:

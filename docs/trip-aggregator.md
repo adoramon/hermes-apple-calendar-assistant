@@ -1,9 +1,12 @@
 # Trip Aggregator
 
-Status: Phase 46 WeChat validation closure.
+Status: Phase 49 flight-plan merge.
 
-`scripts/trip_aggregator.py` 将机票、酒店、高铁订单聚合为一次出行 Trip。它只写入
+`scripts/trip_aggregator.py` 将酒店、高铁订单和机票匹配线索聚合为一次出行 Trip。它只写入
 `data/trip_drafts.json`，不写 Apple Calendar。
+
+航班由航旅纵横统一管理，并自动写入 Apple Calendar 的 `飞行计划`。本项目不创建航班
+日程，机票截图只用于匹配和关联 `飞行计划`。
 
 ## 输入流程
 
@@ -24,6 +27,8 @@ python3 scripts/trip_aggregator.py cancel --trip-id <id>
 - 订单日期与 Trip 起止日期相差不超过 3 天时优先合并。
 - 酒店入住日期与交通到达日期接近时合并。
 - 回程交通从目的地返回北京或原出发城市时合并。
+- `source=travel_intent` 的计划 Trip 优先接收后续酒店/高铁/机票线索。
+- `order_type=flight` 不进入待创建事件，只尝试关联 `飞行计划`。
 - 无法判断时创建新 Trip，并由 Hermes 询问用户是否归并。
 
 ## Trip 结构
@@ -37,6 +42,9 @@ python3 scripts/trip_aggregator.py cancel --trip-id <id>
   "start_date": "2026-05-01",
   "end_date": "2026-05-03",
   "orders": [],
+  "linked_flights": {},
+  "flight_link_status": "flight_pending_sync",
+  "planning_status": "planned_only",
   "calendar": null,
   "suggested_calendar": "商务计划",
   "needs_calendar_choice": true,
@@ -47,6 +55,11 @@ python3 scripts/trip_aggregator.py cancel --trip-id <id>
 ## 安全边界
 
 - 不直接写 Calendar。
+- 不创建航班日程。
+- 不写 `飞行计划`。
+- 不修改 `飞行计划`。
+- 不删除 `飞行计划`。
+- 不重复写航班。
 - 不请求外部网络。
 - 不读取微信 token。
 - 不保存截图原图。

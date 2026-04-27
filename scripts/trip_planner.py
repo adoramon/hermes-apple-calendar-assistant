@@ -257,6 +257,10 @@ def draft_trip(text: str) -> dict[str, Any]:
         "same_day_return": payload.get("same_day_return", False),
         "needs_hotel": payload.get("needs_hotel", False),
         "events": [],
+        "linked_flights": {},
+        "needs_flight": True,
+        "flight_link_status": "flight_pending_sync",
+        "planning_status": "planned_only",
         "missing_fields": list(payload.get("missing_fields") or []),
         "parser_missing_fields": list(payload.get("missing_fields") or []),
         "assumptions": list(payload.get("assumptions") or []),
@@ -372,7 +376,12 @@ def confirm_trip(trip_id: str) -> dict[str, Any]:
     if trip.get("missing_fields"):
         return _result(False, data={"missing_fields": trip.get("missing_fields")}, error="trip_missing_required_fields")
 
-    events = [event for event in trip.get("events", []) if isinstance(event, dict)]
+    skipped_types = {"outbound_placeholder", "return_placeholder"}
+    events = [
+        event
+        for event in trip.get("events", [])
+        if isinstance(event, dict) and event.get("event_type") not in skipped_types
+    ]
     if not events:
         return _result(False, data={"missing_fields": ["events"]}, error="trip_has_no_events")
 

@@ -56,6 +56,7 @@ def extract_route_and_terminals(title: str) -> dict[str, Any]:
     compact_title = _clean_text(title)
     compact_title = re.sub(r"^乘坐", "", compact_title)
     compact_title = FLIGHT_NO_RE.sub("", compact_title, count=1)
+    compact_title = re.sub(r"(当地时间|北京时间|起飞|到达|【).*$", "", compact_title)
     route_match = ROUTE_DASH_RE.search(compact_title)
     if not route_match:
         route_match = ROUTE_TO_RE.search(compact_title)

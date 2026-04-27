@@ -105,6 +105,11 @@ Current version: `v2.0-rc local dispatch dry-run`
   `travel_intent_parser.py parse`、`trip_planner.py draft`、
   `trip_planner.py set-field`、`trip_planner.py confirm` 日志关键字、
   三轮微信确认流程、成功判断标准、失败排查和测试数据清理方法
+- Phase 49 计划 Trip 与飞行计划/酒店/高铁自动合并：
+  新增 `flight_plan_reader.py`、`trip_flight_matcher.py` 和
+  `docs/trip-flight-plan-merge.md`，从 Apple Calendar `飞行计划` 只读关联航班，
+  机票截图只作为匹配线索，不创建航班日程；`trip_flow.py confirm` 只写酒店、
+  高铁、客户拜访等非航班事件
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

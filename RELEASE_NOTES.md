@@ -411,6 +411,30 @@ Apple Calendar
   并说明如何查看 `data/trip_drafts.json`、取消 trip draft，以及通过
   Apple Calendar 或现有安全删除流程清理测试日程。
 
+### Phase 49 Trip Flight Plan Merge
+
+- 新增 `scripts/flight_plan_reader.py`：
+  只读读取 Apple Calendar `飞行计划` 中的未来航班，复用 `calendar_ops.py` 查询和
+  `flight_parser.py` 解析，不创建、不修改、不删除航班事件。
+- 新增 `scripts/trip_flight_matcher.py`：
+  根据 Trip 的 `origin_city`、`destination_city`、`start_date`、`end_date` 匹配
+  `飞行计划` 去程/返程航班，并写回 Trip 草稿的 `linked_flights`。
+- 新增文档：`docs/trip-flight-plan-merge.md`。
+- `trip_aggregator.py` 调整：
+  `order_type=flight` 不再进入待创建 `orders`，只作为 `flight_order_hints` 辅助匹配
+  `飞行计划`；酒店和高铁仍按原逻辑合并，且优先合并到 `source=travel_intent` 的计划 Trip。
+- `trip_flow.py` 调整：
+  draft 中展示“已关联到「飞行计划」”的只读航班；confirm 时跳过 `linked_flights`、
+  机票订单和去程/返程占位，只写酒店、高铁、客户拜访等非航班事件；`trip_seen.json`
+  只记录实际创建的非航班事件。
+- `assistant_persona.py` 新增：
+  `format_trip_flight_linked`、
+  `format_trip_flight_pending_sync`、
+  `format_trip_with_readonly_flights`。
+- 安全边界：
+  不创建航班日程、不写 `飞行计划`、不修改 `飞行计划`、不删除 `飞行计划`、
+  不重复写航班、不读微信 token、不请求外部网络、不自动订票、不跳过确认。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：

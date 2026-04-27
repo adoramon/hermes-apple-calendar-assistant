@@ -436,6 +436,110 @@ def format_trip_duplicate_warning(trip: dict[str, Any]) -> str:
     )
 
 
+def _readonly_flight_line(flight: dict[str, Any], label: str) -> list[str]:
+    flight_no = clean_text(flight.get("flight_no"))
+    dep = clean_text(flight.get("departure_airport"))
+    dep_terminal = clean_text(flight.get("departure_terminal"))
+    arr = clean_text(flight.get("arrival_airport"))
+    arr_terminal = clean_text(flight.get("arrival_terminal"))
+    route = f"{dep}{dep_terminal} → {arr}{arr_terminal}".strip(" →")
+    heading = f"✈️ {label}：{flight_no} {route}".strip()
+    lines = [heading]
+    time_text = format_time_range(flight.get("start"), flight.get("end"))
+    if time_text:
+        lines.append(f"   🕐 {time_text}")
+    location = clean_text(flight.get("location"))
+    if location:
+        lines.append(f"   📍 {location}")
+    lines.append("   来源：飞行计划，只读，不重复写入")
+    return lines
+
+
+def _linked_flight_sections(trip: dict[str, Any]) -> list[str]:
+    linked = trip.get("linked_flights") if isinstance(trip.get("linked_flights"), dict) else {}
+    lines: list[str] = []
+    outbound = linked.get("outbound")
+    return_flight = linked.get("return")
+    if isinstance(outbound, dict) or isinstance(return_flight, dict):
+        lines.append("已关联到「飞行计划」：")
+        if isinstance(outbound, dict):
+            lines.extend(_readonly_flight_line(outbound, "去程"))
+        if isinstance(return_flight, dict):
+            if isinstance(outbound, dict):
+                lines.append("")
+            lines.extend(_readonly_flight_line(return_flight, "返程"))
+    return lines
+
+
+def format_trip_with_readonly_flights(trip: dict[str, Any]) -> str:
+    """Format a Trip draft with linked read-only flight calendar events."""
+    events = [event for event in trip.get("events", []) if isinstance(event, dict)]
+    destination = clean_text(trip.get("destination_city")) or "这次"
+    start = _format_trip_date(trip.get("start_date"))
+    end = _format_trip_date(trip.get("end_date"))
+    lines = [
+        f"高先生，我把这次{destination}出行整理好了 ✈️🏨",
+        "",
+        f"📍 目的地：{destination}",
+        f"📅 时间：{start} - {end}",
+        "",
+    ]
+    flight_lines = _linked_flight_sections(trip)
+    if flight_lines:
+        lines.extend(flight_lines)
+        lines.append("")
+
+    lines.append("待写入 Apple Calendar：")
+    if events:
+        for index, event in enumerate(events, start=1):
+            event_lines = _format_trip_event_line(event)
+            lines.append(f"{index}. {event_lines[0]}")
+            lines.extend(event_lines[1:])
+            if index != len(events):
+                lines.append("")
+    else:
+        lines.append("暂无需要写入商务/个人/夫妻日历的非航班日程。")
+
+    missing = set(trip.get("missing_fields") or [])
+    if "calendar" in missing or not trip.get("calendar"):
+        suggested = clean_text(trip.get("suggested_calendar"))
+        lines.extend(["", "请您确认写入哪个日历：", "- 商务计划", "- 个人计划", "- 夫妻计划"])
+        if suggested:
+            lines.extend(["", f"我这边建议先放到「{suggested}」，但最终听您的。"])
+    else:
+        lines.extend(["", f"请确认是否写入「{clean_text(trip.get('calendar'))}」。"])
+    return "\n".join(lines)
+
+
+def format_trip_flight_linked(trip: dict[str, Any]) -> str:
+    """Format a successful read-only flight link message."""
+    destination = clean_text(trip.get("destination_city")) or "这次出行"
+    lines = [
+        "高先生，我看这趟航班已经在「飞行计划」里了，我就不重复写入啦 ✈️",
+        "",
+        f"我已经把它关联到这次{destination}出行：",
+        "",
+    ]
+    sections = _linked_flight_sections(trip)
+    if sections:
+        lines.extend(sections[1:] if sections[0].startswith("已关联") else sections)
+    lines.extend(["", "接下来我只会把酒店、客户拜访和高铁安排写入您选择的日历。"])
+    return "\n".join(lines)
+
+
+def format_trip_flight_pending_sync(trip: dict[str, Any]) -> str:
+    """Format no matching 飞行计划 flight yet."""
+    destination = clean_text(trip.get("destination_city")) or "这次出行"
+    return "\n".join(
+        [
+            f"高先生，我还没有在「飞行计划」里找到这次{destination}出行对应的航班。",
+            "",
+            "机票仍由航旅纵横统一同步到「飞行计划」，我不会重复创建航班日程。",
+            "等航旅纵横同步后，我再帮您把航班关联进 Trip。",
+        ]
+    )
+
+
 def _travel_label_date(value: Any) -> str:
     parsed = parse_datetime(value)
     if parsed is None and isinstance(value, str):

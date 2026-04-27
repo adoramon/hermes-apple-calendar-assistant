@@ -298,6 +298,11 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_
 
 ## Business Travel Trip Rules
 
+强规则：航班由航旅纵横统一管理，并由航旅纵横自动写入 Apple Calendar 的
+`飞行计划`。本 Skill 不得创建航班日程，不得把机票订单写入 `商务计划`、`个人计划`
+或 `夫妻计划`。`飞行计划` 只允许已有 `flight_auto_enhancer.py` location 增强能力写入，
+其他普通 CRUD 和 Trip 写入都不得修改它。
+
 当用户发送机票、高铁、酒店订单文字或截图 OCR 文本时，优先进入商务出行聚合流程。
 该流程高于普通单个日程创建；除非用户明确说“只处理这一张订单”，不要直接创建单个
 日程。
@@ -308,25 +313,45 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/hotel_
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/travel_order_parser.py parse --text "<订单文字>"
 ```
 
-2. 如果 `order_type` 是 `flight`、`train` 或 `hotel`，调用 Trip 聚合：
+2. 如果 `order_type` 是 `train` 或 `hotel`，调用 Trip 聚合：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py add --text "<订单文字>"
 ```
 
-3. 展示统一 Trip 草稿：
+3. 如果 `order_type` 是 `flight`，只能作为匹配线索：
+
+- 解析航班信息
+- 尝试从 `飞行计划` 匹配
+- 匹配成功则关联 Trip
+- 匹配失败则提示等待航旅纵横同步
+- 不创建航班日程
+
+可调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py add --text "<机票订单文字>"
+```
+
+4. 对已有计划 Trip，可主动匹配 `飞行计划`：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flight_matcher.py match --trip-id "<trip_id>" --days 30
+```
+
+5. 展示统一 Trip 草稿：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py draft --trip-id "<trip_id>"
 ```
 
-4. 如果缺少日历选择，必须询问用户写入：
+6. 如果缺少日历选择，必须询问用户写入：
 
 - `商务计划`
 - `个人计划`
 - `夫妻计划`
 
-5. 用户选择日历后，调用：
+7. 用户选择日历后，调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py set-calendar \
@@ -334,16 +359,17 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_f
   --calendar "商务计划"
 ```
 
-6. 用户明确确认后，才调用：
+8. 用户明确确认后，才调用：
 
 ```bash
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py confirm --trip-id "<trip_id>"
 ```
 
-7. 不写 `飞行计划`，不写 `家庭计划`，不写 Apple Reminders。
-8. 不读取微信 token，不请求外部网络，不保存截图原图。
-9. 截图识别由 Hermes / 多模态 / OCR 完成，本 Skill 只处理提取后的文字。
-10. Trip confirm 会按 fingerprint 去重；不得覆盖旧日程，不得删除旧日程。
+9. confirm 只能写酒店、高铁、客户拜访等非航班事件。
+10. 不写 `飞行计划`，不写 `家庭计划`，不写 Apple Reminders。
+11. 不读取微信 token，不请求外部网络，不保存截图原图。
+12. 截图识别由 Hermes / 多模态 / OCR 完成，本 Skill 只处理提取后的文字。
+13. Trip confirm 会按 fingerprint 去重；不得覆盖旧日程，不得删除旧日程。
 
 ### WeChat Trip Validation
 

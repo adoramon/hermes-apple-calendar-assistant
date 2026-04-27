@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import travel_order_parser, util
+    from . import flight_plan_reader, travel_order_parser, trip_flight_matcher, util
 except ImportError:  # Allows running as: python3 scripts/trip_aggregator.py ...
+    import flight_plan_reader  # type: ignore
     import travel_order_parser  # type: ignore
+    import trip_flight_matcher  # type: ignore
     import util  # type: ignore
 
 
@@ -107,6 +109,16 @@ def _matches_trip(trip: dict[str, Any], order: dict[str, Any], destination: str,
     return any(_date_close(item, trip_start.date()) or _date_close(item, trip_end.date()) for item in dates)
 
 
+def _matching_trips(trips: dict[str, Any], order: dict[str, Any], destination: str, dates: list[date]) -> list[dict[str, Any]]:
+    matches = [
+        trip
+        for trip in trips.values()
+        if isinstance(trip, dict) and trip.get("status") == "draft" and _matches_trip(trip, order, destination, dates)
+    ]
+    matches.sort(key=lambda item: (0 if item.get("source") == "travel_intent" else 1, str(item.get("updated_at", ""))))
+    return matches
+
+
 def _update_trip_bounds(trip: dict[str, Any]) -> None:
     dates: list[date] = []
     for order in trip.get("orders", []):
@@ -134,6 +146,59 @@ def _suggest_calendar(orders: list[dict[str, Any]]) -> str:
     return "个人计划"
 
 
+def _ensure_trip_defaults(trip: dict[str, Any]) -> None:
+    trip.setdefault("origin_city", "北京")
+    trip.setdefault("linked_flights", {})
+    trip.setdefault("needs_flight", True)
+
+
+def _handle_flight_order(order: dict[str, Any], destination: str, dates: list[date]) -> dict[str, Any]:
+    store = _read_store()
+    trips = store.setdefault("trips", {})
+    matches = _matching_trips(trips, order, destination, dates)
+    if not matches:
+        return _result(
+            True,
+            data={
+                "added_order": order,
+                "trip": None,
+                "created_new_trip": False,
+                "flight_link_status": "flight_pending_sync",
+                "message": "我没有找到可合并的出行草稿，也不会创建航班日程。等航旅纵横同步后，我再帮您合并。",
+            },
+        )
+
+    target = matches[0]
+    _ensure_trip_defaults(target)
+    flights_result = flight_plan_reader.list_flights(days=30)
+    if not flights_result.get("ok"):
+        return flights_result
+    flights = [item for item in flights_result.get("data", {}).get("flights", []) if isinstance(item, dict)]
+    match_result = trip_flight_matcher.link_matching_flights(target, flights)
+    target.setdefault("flight_order_hints", [])
+    if not any(existing.get("raw_text_hash") == order["raw_text_hash"] for existing in target["flight_order_hints"] if isinstance(existing, dict)):
+        target["flight_order_hints"].append(order)
+    trip_flight_matcher.update_planning_status(target)
+    target["updated_at"] = util.now_local_iso()
+    _write_store(store)
+    if match_result.get("linked"):
+        message = "我已经从「飞行计划」找到对应航班并关联到这次 Trip，不会重复写入航班日程。"
+    else:
+        message = "我没有在飞行计划中找到这趟航班。等航旅纵横同步后，我再帮您合并。"
+    return _result(
+        True,
+        data={
+            "trip": target,
+            "added_order": order,
+            "created_new_trip": False,
+            "linked": match_result.get("linked", {}),
+            "ambiguous_candidates": match_result.get("ambiguous_candidates", {}),
+            "flight_link_status": target.get("flight_link_status"),
+            "message": message,
+        },
+    )
+
+
 def add_order(text: str) -> dict[str, Any]:
     parsed = travel_order_parser.parse_order_text(text)
     if parsed.get("order_type") == "unknown":
@@ -152,14 +217,12 @@ def add_order(text: str) -> dict[str, Any]:
     dates = _order_dates(order)
     if not dates:
         return _result(False, data={"parsed": parsed}, error="travel_order_missing_dates")
+    if order["order_type"] == "flight":
+        return _handle_flight_order(order, destination, dates)
 
     store = _read_store()
     trips = store.setdefault("trips", {})
-    target: dict[str, Any] | None = None
-    for trip in trips.values():
-        if isinstance(trip, dict) and trip.get("status") == "draft" and _matches_trip(trip, order, destination, dates):
-            target = trip
-            break
+    target = _matching_trips(trips, order, destination, dates)[0] if _matching_trips(trips, order, destination, dates) else None
 
     created_new = False
     if target is None:
@@ -169,10 +232,15 @@ def add_order(text: str) -> dict[str, Any]:
             "trip_id": trip_id,
             "status": "draft",
             "title": _build_title(destination, [order]),
+            "origin_city": "北京",
             "destination_city": destination,
             "start_date": start_date,
             "end_date": max(dates).isoformat(),
             "orders": [],
+            "linked_flights": {},
+            "needs_flight": True,
+            "flight_link_status": "flight_pending_sync",
+            "planning_status": "planned_only",
             "calendar": None,
             "suggested_calendar": _suggest_calendar([order]),
             "needs_calendar_choice": True,
@@ -183,15 +251,20 @@ def add_order(text: str) -> dict[str, Any]:
         trips[trip_id] = target
         created_new = True
 
+    _ensure_trip_defaults(target)
     if not any(existing.get("raw_text_hash") == order["raw_text_hash"] for existing in target.get("orders", []) if isinstance(existing, dict)):
         target.setdefault("orders", []).append(order)
     if destination and not target.get("destination_city"):
         target["destination_city"] = destination
-    target["title"] = _build_title(str(target.get("destination_city") or destination), list(target.get("orders") or []))
-    target["suggested_calendar"] = _suggest_calendar(list(target.get("orders") or []))
+    if target.get("source") != "travel_intent":
+        target["title"] = _build_title(str(target.get("destination_city") or destination), list(target.get("orders") or []))
+        target["suggested_calendar"] = _suggest_calendar(list(target.get("orders") or []))
+    else:
+        target.setdefault("suggested_calendar", target.get("calendar") or _suggest_calendar(list(target.get("orders") or [])))
     target["missing_fields"] = ["calendar"] if not target.get("calendar") else []
     target["needs_calendar_choice"] = not bool(target.get("calendar"))
     _update_trip_bounds(target)
+    trip_flight_matcher.update_planning_status(target)
     _write_store(store)
     return _result(True, data={"trip": target, "added_order": order, "created_new_trip": created_new})
 

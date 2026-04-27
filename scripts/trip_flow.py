@@ -68,33 +68,6 @@ def _note_lines(items: list[tuple[str, Any]]) -> str:
     return "\n".join(f"{label}：{value}" for label, value in items if value)
 
 
-def _flight_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
-    fields = order.get("fields", {})
-    dep = "".join([str(fields.get("departure_airport") or ""), str(fields.get("departure_terminal") or "")])
-    arr = "".join([str(fields.get("arrival_airport") or ""), str(fields.get("arrival_terminal") or "")])
-    title = f"航班｜{fields.get('flight_no')} {fields.get('departure_city')}→{fields.get('arrival_city')}"
-    return {
-        "event_type": "flight",
-        "title": title,
-        "calendar": calendar,
-        "start": fields.get("departure_datetime", ""),
-        "end": fields.get("arrival_datetime", ""),
-        "location": dep,
-        "notes": _note_lines(
-            [
-                ("航班号", fields.get("flight_no")),
-                ("航空公司", fields.get("airline")),
-                ("出发机场", dep),
-                ("到达机场", arr),
-                ("乘机人", fields.get("passenger_name")),
-                ("订单号", fields.get("confirmation_number")),
-                ("平台来源", order.get("source_platform")),
-            ]
-        ),
-        "confirmation_number": fields.get("confirmation_number", ""),
-    }
-
-
 def _train_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
     fields = order.get("fields", {})
     title = f"高铁｜{fields.get('train_no')} {fields.get('departure_station')}→{fields.get('arrival_station')}"
@@ -118,6 +91,38 @@ def _train_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
         ),
         "confirmation_number": fields.get("confirmation_number", ""),
     }
+
+
+def _placeholder_event(event: dict[str, Any], calendar: str | None) -> dict[str, Any]:
+    event_type = str(event.get("event_type") or "")
+    title = str(event.get("title") or "")
+    if event_type == "meeting_placeholder":
+        title = title.replace("客户拜访｜", "客户拜访计划｜")
+    elif event_type == "hotel_placeholder":
+        title = title.replace("住宿｜", "住宿计划｜")
+    elif event_type == "leisure_placeholder":
+        title = title.replace("出行安排｜", "出行安排计划｜")
+    return {
+        "event_type": event_type,
+        "title": title,
+        "calendar": calendar,
+        "start": event.get("start", ""),
+        "end": event.get("end", ""),
+        "location": event.get("location", ""),
+        "notes": event.get("notes", ""),
+        "confirmation_number": "",
+    }
+
+
+def _flight_note_lines(trip: dict[str, Any]) -> str:
+    linked = trip.get("linked_flights") if isinstance(trip.get("linked_flights"), dict) else {}
+    lines = []
+    for label, key in (("去程航班", "outbound"), ("返程航班", "return")):
+        flight = linked.get(key)
+        if not isinstance(flight, dict):
+            continue
+        lines.append(f"{label}（只读飞行计划）：{flight.get('flight_no', '')} {flight.get('title', '')}".strip())
+    return "\n".join(lines)
 
 
 def _hotel_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
@@ -150,7 +155,20 @@ def _hotel_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
 def build_events(trip: dict[str, Any]) -> list[dict[str, Any]]:
     calendar = trip.get("calendar")
     events: list[dict[str, Any]] = []
-    builders = {"flight": _flight_event, "train": _train_event, "hotel": _hotel_event}
+    builders = {"train": _train_event, "hotel": _hotel_event}
+    skipped_placeholders = {"outbound_placeholder", "return_placeholder"}
+    has_hotel_order = any(isinstance(order, dict) and order.get("order_type") == "hotel" for order in trip.get("orders", []))
+    for event in trip.get("events", []):
+        if not isinstance(event, dict):
+            continue
+        if event.get("event_type") in skipped_placeholders:
+            continue
+        if event.get("event_type") == "hotel_placeholder" and has_hotel_order:
+            continue
+        if str(event.get("event_type") or "").endswith("_placeholder"):
+            item = _placeholder_event(event, calendar)
+            if item.get("title") and item.get("start") and item.get("end"):
+                events.append(item)
     for order in trip.get("orders", []):
         if not isinstance(order, dict):
             continue
@@ -159,6 +177,11 @@ def build_events(trip: dict[str, Any]) -> list[dict[str, Any]]:
             event = builder(order, calendar)
             if event.get("title") and event.get("start") and event.get("end"):
                 events.append(event)
+    linked_notes = _flight_note_lines(trip)
+    if linked_notes:
+        for event in events:
+            notes = str(event.get("notes") or "")
+            event["notes"] = f"{notes}\n{linked_notes}".strip()
     events.sort(key=lambda item: str(item.get("start", "")))
     return events
 
@@ -191,9 +214,10 @@ def draft_trip(trip_id: str) -> dict[str, Any]:
         "trip": trip,
         "calendar": trip.get("calendar"),
         "events": events,
+        "linked_flights": trip.get("linked_flights", {}),
         "needs_confirmation": True,
         "missing_fields": missing,
-        "display_message": assistant_persona.format_trip_draft({**trip, "events": events, "missing_fields": missing}),
+        "display_message": assistant_persona.format_trip_with_readonly_flights({**trip, "events": events, "missing_fields": missing}),
     }
     return _result(True, data=data)
 

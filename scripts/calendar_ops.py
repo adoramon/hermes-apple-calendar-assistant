@@ -80,17 +80,9 @@ def _parse_datetime(value: datetime | date | str | None) -> datetime | None:
 
 
 def _apple_date_assignment(var_name: str, value: datetime) -> str:
-    month_name = MONTH_NAMES[value.month - 1]
-    seconds_since_midnight = value.hour * 3600 + value.minute * 60 + value.second
-    return "\n".join(
-        [
-            f"set {var_name} to current date",
-            f"set year of {var_name} to {value.year}",
-            f"set month of {var_name} to {month_name}",
-            f"set day of {var_name} to {value.day}",
-            f"set time of {var_name} to {seconds_since_midnight}",
-        ]
-    )
+    # Numeric date strings avoid AppleScript month constant parsing issues on
+    # non-English macOS locales.
+    return f'set {var_name} to date "{value:%Y-%m-%d %H:%M:%S}"'
 
 
 def _run_osascript(script: str) -> tuple[bool, str, str | None]:
