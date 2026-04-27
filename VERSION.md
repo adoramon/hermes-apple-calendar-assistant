@@ -89,6 +89,12 @@ Current version: `v2.0-rc local dispatch dry-run`
   新增 `travel_order_parser.py`、`trip_aggregator.py`、`trip_flow.py`，
   支持机票/酒店/高铁订单聚合为一次 Trip，确认日历后一次性写入 Apple Calendar，
   并通过 `trip_seen.json` 做事件 fingerprint 去重
+- Phase 46 微信端 Trip 聚合实测收口：
+  补充连续发送机票/酒店/高铁订单截图的标准微信链路、日志关键字
+  `travel_order_parser.py parse`、`trip_aggregator.py add`、
+  `trip_flow.py draft`、`trip_flow.py set-calendar`、`trip_flow.py confirm`，
+  并文档化成功判断标准、失败排查、测试话术与 `trip_drafts.json` /
+  `trip_seen.json` 清理方法
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

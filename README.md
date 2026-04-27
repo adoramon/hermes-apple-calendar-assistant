@@ -185,6 +185,19 @@ write `飞行计划`, does not operate Apple Reminders, does not request the net
 and does not save screenshot images. See [docs/trip-aggregator.md](docs/trip-aggregator.md)
 and [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
 
+Phase 46 WeChat Trip aggregation validation closure: the expected WeChat flow
+is now documented as continuous travel order screenshots -> Hermes OCR text
+extraction -> `travel_order_parser.py parse` -> `trip_aggregator.py add` ->
+`trip_flow.py draft` -> calendar follow-up (`商务计划` / `个人计划` / `夫妻计划`) ->
+`trip_flow.py set-calendar` -> explicit confirmation -> `trip_flow.py confirm`
+-> one-time Apple Calendar write. The validation docs also record required log
+keywords, success criteria, failure triage, test phrases, and rollback /
+cleanup guidance for `trip_drafts.json` and `trip_seen.json`. This flow still
+must not write `飞行计划`, must not write Apple Reminders, and must not skip
+confirmation. See [docs/trip-wechat-validation.md](docs/trip-wechat-validation.md),
+[docs/trip-aggregator.md](docs/trip-aggregator.md), and
+[docs/business-travel-secretary.md](docs/business-travel-secretary.md).
+
 ## Calendar Policy
 
 Read calendars:

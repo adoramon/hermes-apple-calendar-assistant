@@ -309,6 +309,42 @@ Apple Calendar
   confirm 前必须选择 `商务计划`、`个人计划` 或 `夫妻计划`；
   不写 `飞行计划`、不写 Apple Reminders、不请求外部网络、不保存截图原图。
 
+### Phase 46 WeChat Trip Aggregation Validation Closure
+
+- 新增文档：`docs/trip-wechat-validation.md`。
+- 已收口微信端标准实测链路：
+  连续发送机票订单截图、酒店订单截图、高铁/返程订单截图后，
+  Hermes 应按顺序执行 Hermes OCR 文本提取 ->
+  `travel_order_parser.py parse` ->
+  `trip_aggregator.py add` ->
+  `trip_flow.py draft` ->
+  追问日历 `商务计划` / `个人计划` / `夫妻计划` ->
+  `trip_flow.py set-calendar` ->
+  用户确认 ->
+  `trip_flow.py confirm` ->
+  一次性写入 Apple Calendar。
+- 已记录预期日志关键字：
+  `travel_order_parser.py parse`、
+  `trip_aggregator.py add`、
+  `trip_flow.py draft`、
+  `trip_flow.py set-calendar`、
+  `trip_flow.py confirm`。
+- 已明确成功判断标准：
+  Trip 草稿中应同时包含去程交通、酒店入住、返程交通；
+  写入前必须先有草稿并明确确认日历；
+  confirm 后 Apple Calendar 应出现多条对应日程；
+  不写 `飞行计划`；
+  不写 Apple Reminders；
+  不得跳过确认直接写入。
+- 已补充失败排查：
+  OCR 未提取文字、未进入 Trip 流程、三张订单未聚合到同一 Trip、未追问日历、
+  以及严重错误“直接写入”。
+- 已补充微信端测试话术与回滚/清理方法：
+  包括“我发你几张订单截图，帮我整理成一次出行”、
+  “放到商务计划”、“确认写入”、“取消这次出行草稿”，
+  并说明如何查看 `data/trip_drafts.json`、取消 Trip draft、查看
+  `data/trip_seen.json`，以及通过 Apple Calendar 或现有安全删除流程删除测试日程。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：

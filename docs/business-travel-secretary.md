@@ -1,6 +1,6 @@
 # Business Travel Secretary
 
-Status: Phase 45 Pro.
+Status: Phase 46 WeChat validation closure.
 
 本阶段把“单个酒店订单写入”升级为“多订单出行聚合”。当用户连续发送机票、酒店、
 高铁订单文字或截图 OCR 文本时，系统应自动整理为一次 Trip，并在确认后一次性写入
@@ -114,3 +114,51 @@ confirm 时如果 fingerprint 已存在，返回 `skipped_duplicate`，不会覆
 - 不删除旧日程。
 - 不读取微信 token。
 - 不保存截图原图。
+
+## 微信端测试话术
+
+- `我发你几张订单截图，帮我整理成一次出行`
+- `放到商务计划`
+- `确认写入`
+- `取消这次出行草稿`
+
+## 微信端成功判断
+
+- Trip 草稿中同时出现去程交通、酒店入住、返程交通。
+- 在写入前，Hermes 明确展示统一 Trip 草稿。
+- Hermes 明确追问并收到日历选择：`商务计划`、`个人计划` 或 `夫妻计划`。
+- 用户确认后，Apple Calendar 中生成多条对应日程。
+- 全流程不写 `飞行计划`。
+- 全流程不写 Apple Reminders。
+- 全流程不允许跳过确认直接写入。
+
+## 回滚与清理
+
+查看当前 Trip 草稿：
+
+```bash
+cat data/trip_drafts.json
+```
+
+取消某次 Trip 草稿：
+
+```bash
+python3 scripts/trip_flow.py cancel --trip-id <trip_id>
+```
+
+或：
+
+```bash
+python3 scripts/trip_aggregator.py cancel --trip-id <trip_id>
+```
+
+查看已写入去重记录：
+
+```bash
+cat data/trip_seen.json
+```
+
+删除测试日程的方法：
+
+- 必须通过 Apple Calendar 手动删除，或走现有安全删除流程。
+- 不要直接手改 `data/trip_seen.json` 来假装回滚。

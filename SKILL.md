@@ -345,6 +345,86 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_f
 9. 截图识别由 Hermes / 多模态 / OCR 完成，本 Skill 只处理提取后的文字。
 10. Trip confirm 会按 fingerprint 去重；不得覆盖旧日程，不得删除旧日程。
 
+### WeChat Trip Validation
+
+微信端连续发送多张出行订单截图时，标准流程必须是：
+
+1. 用户连续发送：
+- 机票订单截图
+- 酒店订单截图
+- 高铁或返程订单截图
+
+2. Hermes / 多模态模型先从每张截图提取 OCR 文本。
+3. 每张订单文字都应优先调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/travel_order_parser.py parse --text "<订单文字>"
+```
+
+4. 识别为 `flight`、`hotel` 或 `train` 后，应继续调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py add --text "<订单文字>"
+```
+
+5. 聚合后应展示统一 Trip 草稿：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py draft --trip-id "<trip_id>"
+```
+
+6. 如果 `missing_fields` 包含 `calendar`，必须追问用户写入：
+- `商务计划`
+- `个人计划`
+- `夫妻计划`
+
+7. 用户明确选择后，再调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py set-calendar \
+  --trip-id "<trip_id>" \
+  --calendar "商务计划"
+```
+
+8. 用户明确说“确认写入”或同等确认后，才允许调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py confirm --trip-id "<trip_id>"
+```
+
+预期日志关键字：
+
+- `travel_order_parser.py parse`
+- `trip_aggregator.py add`
+- `trip_flow.py draft`
+- `trip_flow.py set-calendar`
+- `trip_flow.py confirm`
+
+成功判断标准：
+
+- Trip 内应包含去程交通、酒店入住、返程交通。
+- 写入前必须展示 Trip 草稿。
+- 日历选择必须由用户明确确认。
+- confirm 后 Apple Calendar 应出现多条对应日程。
+- 不写 `飞行计划`。
+- 不写 Apple Reminders。
+- 不得跳过确认直接写入。
+
+失败排查：
+
+- 截图未识别：先检查 Hermes 是否提取出 OCR 文本；如无文字，提示用户复制订单文字重试。
+- 没进入 Trip 流程：检查本 `SKILL.md` 是否仍要求优先 `travel_order_parser.py`；检查 `gateway.log` 是否出现 parser 调用。
+- 三张订单没有聚合到同一 Trip：检查 `destination_city`；检查日期是否相差超过 3 天；必要时查看 `python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py list`。
+- 没追问日历：检查 `trip_flow.py draft` 返回的 `missing_fields` 是否包含 `calendar`。
+- 直接写入：属于严重错误，必须修正本 `SKILL.md`；所有 Trip 写入前必须先 confirm。
+
+推荐微信测试话术：
+
+- `我发你几张订单截图，帮我整理成一次出行`
+- `放到商务计划`
+- `确认写入`
+- `取消这次出行草稿`
+
 ## Update Rules
 
 用户要求修改日程时，先识别：
