@@ -95,6 +95,11 @@ Current version: `v2.0-rc local dispatch dry-run`
   `trip_flow.py draft`、`trip_flow.py set-calendar`、`trip_flow.py confirm`，
   并文档化成功判断标准、失败排查、测试话术与 `trip_drafts.json` /
   `trip_seen.json` 清理方法
+- Phase 47 老板一句话出差模式：
+  新增 `travel_intent_parser.py`、`trip_planner.py` 和
+  `docs/travel-intent-planner.md`，支持直接从自然语言出差/旅行意图生成
+  Trip planning draft，经用户确认后写入 Apple Calendar；仅生成本地计划草稿，
+  不订票、不查价格、不查实时航班、不请求外部网络
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

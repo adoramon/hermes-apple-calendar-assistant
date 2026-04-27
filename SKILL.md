@@ -425,6 +425,73 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_f
 - `确认写入`
 - `取消这次出行草稿`
 
+## Travel Intent Planning Rules
+
+当用户表达出差或旅行意图，但没有提供订单时，应优先进入一句话出差模式，而不是直接
+创建普通单个日程。
+
+适用示例：
+
+- `下周去上海见客户，两天`
+- `周五广州出差，当天回`
+- `和太太下月去东京玩五天`
+- `下周三去深圳拜访客户，住一晚`
+
+处理顺序：
+
+1. 先调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/travel_intent_parser.py parse "<用户原文>"
+```
+
+2. 如果识别为 `business_trip`、`personal_trip` 或 `couple_trip`，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py draft --text "<用户原文>"
+```
+
+3. 展示计划草稿，并明确说明：
+
+- 这是计划草稿
+- 不代表真实订票或订房
+- 后续可用订单截图替换准确行程
+
+4. 如果草稿缺字段，优先根据 `missing_fields` 追问，例如：
+
+- `destination_city`
+- `start_date`
+- `duration_days`
+
+5. 用户补充字段或调整日历时，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py set-field \
+  --trip-id "<trip_id>" \
+  --field "calendar" \
+  --value "商务计划"
+```
+
+6. 用户明确确认后，才允许调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py confirm --trip-id "<trip_id>"
+```
+
+7. 用户取消时，调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py cancel --trip-id "<trip_id>"
+```
+
+8. 不直接写 Apple Calendar。
+9. 不请求外网查询航班、酒店、价格或实时数据。
+10. 不写 Apple Reminders。
+11. 不写 `飞行计划`。
+12. 如果用户后续发送订单截图，应转交 `travel_order_parser.py` +
+    `trip_aggregator.py` + `trip_flow.py` 处理真实订单聚合，不把一句话计划草稿当作
+    最终真实行程。
+
 ## Update Rules
 
 用户要求修改日程时，先识别：

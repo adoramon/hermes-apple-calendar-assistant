@@ -345,6 +345,32 @@ Apple Calendar
   并说明如何查看 `data/trip_drafts.json`、取消 Trip draft、查看
   `data/trip_seen.json`，以及通过 Apple Calendar 或现有安全删除流程删除测试日程。
 
+### Phase 47 One-sentence Travel Planning Mode
+
+- 新增 `scripts/travel_intent_parser.py`：
+  用规则解析自然语言出差/旅行意图，输出 `intent_type`、目的地、出发地、日期、
+  天数、目的、`same_day_return`、`needs_hotel`、建议日历、缺失字段、置信度和
+  `assumptions`。
+- 新增 `scripts/trip_planner.py`：
+  支持 `draft`、`show`、`set-field`、`confirm`、`cancel`，把一句话出差模式的
+  Trip planning draft 写入 `data/trip_drafts.json`。
+- 新增 `docs/travel-intent-planner.md`。
+- `assistant_persona.py` 新增文案函数：
+  `format_travel_intent_draft`、
+  `format_travel_intent_missing_fields`、
+  `format_travel_plan_confirmed`。
+- 已实现默认规划规则：
+  商务两天默认“第一天上午去程 + 第一天下午拜访 + 第一晚住宿 + 第二天下午返程”；
+  当天回默认“上午去程 + 下午拜访 + 傍晚返程”；
+  夫妻/旅行默认“第一天出发 + 住宿 + 最后一天返程”。
+- confirm 写入规则已收紧：
+  只允许写入 `商务计划`、`个人计划`、`夫妻计划`；
+  标题必须保留计划性质，如 `去程计划｜...`、`住宿计划｜...`；
+  notes 中必须写明“由一句话出差模式生成，交通/酒店信息待订单确认。”。
+- 安全边界：
+  不订票、不查价格、不查实时航班、不请求外部网络、不写 Apple Reminders、
+  不写 `飞行计划`、不直接写入、必须确认、不覆盖已有真实订单行程。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：

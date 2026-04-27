@@ -198,6 +198,19 @@ confirmation. See [docs/trip-wechat-validation.md](docs/trip-wechat-validation.m
 [docs/trip-aggregator.md](docs/trip-aggregator.md), and
 [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
 
+Phase 47 one-sentence travel planning mode: users can now express business or
+travel intent without sending order screenshots first, for example “下周去上海见客户，
+两天” or “和太太下月去东京玩五天”. The new local planning flow is
+`travel_intent_parser.py parse` -> `trip_planner.py draft` -> explicit user
+confirmation -> `trip_planner.py confirm`. It only creates local plan drafts,
+does not book tickets, does not query prices, does not request the network, and
+does not treat planned placeholders as real orders. Confirmed titles are written
+as plan placeholders such as `去程计划｜...` and notes state that traffic/hotel
+details still await real orders. If the user later sends order screenshots,
+Hermes should hand the same trip back to the Trip Aggregator flow for accurate
+replacement. See [docs/travel-intent-planner.md](docs/travel-intent-planner.md)
+and [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
+
 ## Calendar Policy
 
 Read calendars:

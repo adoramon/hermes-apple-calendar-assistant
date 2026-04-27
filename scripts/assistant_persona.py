@@ -322,6 +322,16 @@ def _trip_event_icon(event: dict[str, Any]) -> str:
         return "🚄"
     if event_type == "hotel":
         return "🏨"
+    if event_type == "outbound_placeholder":
+        return "✈️"
+    if event_type == "hotel_placeholder":
+        return "🏨"
+    if event_type == "meeting_placeholder":
+        return "🤝"
+    if event_type == "leisure_placeholder":
+        return "🧳"
+    if event_type == "return_placeholder":
+        return "🚄"
     return "📌"
 
 
@@ -424,3 +434,135 @@ def format_trip_duplicate_warning(trip: dict[str, Any]) -> str:
             "我不会重复创建，也不会覆盖旧日程，稳一点更好。✨",
         ]
     )
+
+
+def _travel_label_date(value: Any) -> str:
+    parsed = parse_datetime(value)
+    if parsed is None and isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value + "T00:00:00")
+        except ValueError:
+            parsed = None
+    if parsed is None:
+        return clean_text(value)
+    today = datetime.now().date()
+    current_monday = today - timedelta(days=today.weekday())
+    next_monday = current_monday + timedelta(days=7)
+    if parsed.month != today.month or parsed.year != today.year:
+        return f"{parsed.month}月{parsed.day}日"
+    if parsed.date() == today:
+        return "今天"
+    if parsed.date() == today + timedelta(days=1):
+        return "明天"
+    if current_monday <= parsed.date() <= current_monday + timedelta(days=6):
+        return f"本周{['一', '二', '三', '四', '五', '六', '日'][parsed.weekday()]}"
+    if next_monday <= parsed.date() <= next_monday + timedelta(days=6):
+        return f"下周{['一', '二', '三', '四', '五', '六', '日'][parsed.weekday()]}"
+    return f"{parsed.month}月{parsed.day}日"
+
+
+def _travel_event_summary(event: dict[str, Any]) -> tuple[str, str]:
+    event_type = clean_text(event.get("event_type"))
+    start = parse_datetime(event.get("start"))
+    end = parse_datetime(event.get("end"))
+    start_text = _travel_label_date(event.get("start"))
+    if start and end and start.date() == end.date():
+        when = f"{start_text}{'上午' if start.hour < 12 else '下午'}"
+    else:
+        when = start_text
+    if event_type == "outbound_placeholder":
+        return "🚄/✈️ 去程计划", f"{when}：{clean_text(event.get('title')).replace('去程｜', '')}"
+    if event_type == "meeting_placeholder":
+        return "🤝 客户拜访", f"{when}：{clean_text(event.get('location'))}客户拜访"
+    if event_type == "hotel_placeholder":
+        return "🏨 住宿计划", f"{start_text}晚：{clean_text(event.get('location'))}住宿"
+    if event_type == "return_placeholder":
+        return "🚄/✈️ 返程计划", f"{when}：{clean_text(event.get('title')).replace('返程｜', '')}"
+    if event_type == "leisure_placeholder":
+        return "🧳 出行安排", f"{when}：{clean_text(event.get('location'))}自由安排"
+    return clean_text(event.get("title")), when
+
+
+def format_travel_intent_draft(plan: dict[str, Any]) -> str:
+    """Format a one-sentence travel intent planning draft."""
+    destination = clean_text(plan.get("destination_city")) or "这次出行"
+    purpose = clean_text(plan.get("purpose")) or "出行安排"
+    calendar = clean_text(plan.get("calendar") or plan.get("suggested_calendar"))
+    assumptions = [clean_text(item) for item in plan.get("assumptions", []) if clean_text(item)]
+    start = _travel_label_date(plan.get("start_date"))
+    end = _travel_label_date(plan.get("end_date"))
+    title = "高先生，我先按您的意思整理了一个出行草稿 ✈️"
+    if destination and destination != "这次出行":
+        title = f"高先生，我先按您的意思整理了一个{destination}出行草稿 ✈️"
+    lines = [
+        title,
+        "",
+        f"📍 目的地：{destination}",
+        f"📅 时间：{start} - {end}" if end else f"📅 时间：{start}",
+        f"🎯 目的：{purpose}",
+    ]
+    if calendar:
+        lines.append(f"📅 建议写入：{calendar}")
+    lines.extend(["", "我先这样规划：", ""])
+    events = [event for event in plan.get("events", []) if isinstance(event, dict)]
+    for index, event in enumerate(events, start=1):
+        heading, detail = _travel_event_summary(event)
+        lines.append(f"{index}. {heading}")
+        lines.append(f"   {detail}")
+        if index != len(events):
+            lines.append("")
+    if assumptions:
+        lines.extend(["", "当前默认："])
+        for item in assumptions:
+            lines.append(f"- {item}")
+    lines.extend(
+        [
+            "",
+            "这些是计划草稿，还不是实际订单。",
+            "您确认后，我先写入 Apple Calendar，后面等您发机票/酒店订单截图，我再帮您替换成准确行程。",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def format_travel_intent_missing_fields(plan: dict[str, Any]) -> str:
+    """Format missing field prompts for one-sentence travel planning."""
+    missing = set(plan.get("missing_fields") or [])
+    lines = ["高先生，这次出行我先帮您整理成计划草稿了。", "", "写入前我还需要您补几项信息："]
+    if "destination_city" in missing:
+        lines.append("- 目的地是哪里？")
+    if "start_date" in missing:
+        lines.append("- 您打算哪天出发？")
+    if "duration_days" in missing:
+        lines.append("- 这次大概几天？如果当天回也可以直接告诉我。")
+    lines.extend(
+        [
+            "",
+            "这是计划草稿，不代表真实订票或订房。",
+            "等信息补齐后，我再帮您整理成可确认写入的 Apple Calendar 草稿。",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def format_travel_plan_confirmed(plan: dict[str, Any], results: list[dict[str, Any]]) -> str:
+    """Format confirmed one-sentence travel planning results."""
+    created = [item for item in results if item.get("status") == "created"]
+    failed = [item for item in results if item.get("status") == "failed"]
+    destination = clean_text(plan.get("destination_city")) or "这次出行"
+    calendar = clean_text(plan.get("calendar"))
+    lines = [f"高先生，{destination}这次计划草稿我已经先写进 Apple Calendar 了 ✨", ""]
+    if created:
+        lines.append(f"已新增 {len(created)} 条计划草稿日程。")
+    if failed:
+        lines.append(f"有 {len(failed)} 条没写成功，我稍后可以继续帮您检查。")
+    if calendar:
+        lines.append(f"📅 日历：{calendar}")
+    lines.extend(
+        [
+            "",
+            "这些还是计划草稿，不代表实际机票或酒店订单。",
+            "后面您把订单截图发我，我再帮您替换成准确行程，不会去写飞行计划，也不会写 Apple Reminders。",
+        ]
+    )
+    return "\n".join(lines)
