@@ -128,6 +128,10 @@ Current version: `v2.0-rc local dispatch dry-run`
   新增 `deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist`，
   提供每 30 分钟运行 `trip_briefing_worker.py scan --hours 48` 的用户级 launchd
   模板；不自动安装，只记录安装、卸载、日志和完整 outbox 推送链路
+- Phase 54 微信端一句话查询行程：
+  新增 `schedule_query_router.py` 和 `docs/wechat-schedule-query.md`，支持“今天/明天
+  什么安排”“下周上海出差怎么样”“这个月还有哪些出差”等自然语言查询；
+  只读调用 Calendar 和 Trip 查询能力，输出秘书式摘要
 - 删除日程误报修复：
   新增 `delete_event_flow.py` 和 `docs/delete-event-flow.md`，删除请求先查询候选并生成
   二次确认草稿，确认后按 `calendar + title + start + end` 精确身份删除，避免

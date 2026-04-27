@@ -515,6 +515,20 @@ Apple Calendar
 - 安全边界：
   不自动安装 launchd，不改 Calendar，不创建/删除日程，不请求外网，不读微信 token，只写 outbox。
 
+### Phase 54 WeChat One-line Schedule Query
+
+- 新增 `scripts/schedule_query_router.py`：
+  根据用户原文识别今天、明天、本周、下周、本月、Trip 和城市出行查询。
+- 新增文档：`docs/wechat-schedule-query.md`。
+- `assistant_persona.py` 新增：
+  `format_today_schedule`、`format_tomorrow_schedule`、`format_trip_summary`、
+  `format_week_schedule`。
+- 微信端规则：
+  用户消息包含“安排”“行程”“出差”“会议”“什么时候去”“还有几个会”时，
+  优先调用 `schedule_query_router.py query --text "<原文>"`，使用 `data.summary` 回复。
+- 安全边界：
+  只读查询，不创建、不修改、不删除 Calendar，不请求外网，不读取微信 token。
+
 ### Delete Event Flow False-positive Fix
 
 - 新增 `scripts/delete_event_flow.py`：

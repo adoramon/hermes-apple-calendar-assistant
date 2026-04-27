@@ -253,6 +253,163 @@ def format_no_pending_reminders() -> str:
     return "高总，当前没有待发送的日程提醒。"
 
 
+def _schedule_error_note(errors: list[dict[str, Any]] | None) -> list[str]:
+    if not errors:
+        return []
+    calendars = [clean_text(item.get("calendar")) for item in errors if clean_text(item.get("calendar"))]
+    if not calendars:
+        return ["有部分日历暂时没读成功，我没有把它们算进来。"]
+    return [f"有部分日历暂时没读成功：{'、'.join(calendars)}。"]
+
+
+def _schedule_item_line(event: dict[str, Any]) -> str:
+    start = parse_datetime(event.get("start"))
+    time_text = f"{start:%H:%M}" if start else format_day_time(event.get("start"))
+    title = clean_text(event.get("title")) or "未命名日程"
+    location = clean_text(event.get("location"))
+    if location:
+        return f"{time_text}  {title}（{location}）"
+    return f"{time_text}  {title}"
+
+
+def _trip_short_line(trip: dict[str, Any]) -> str:
+    start = _format_trip_date(trip.get("start_date"))
+    end = _format_trip_date(trip.get("end_date"))
+    destination = clean_text(trip.get("destination_city")) or "出行"
+    title = clean_text(trip.get("title")) or f"{destination}行程"
+    status = clean_text(trip.get("planning_status"))
+    suffix = f"｜{status}" if status else ""
+    return f"{start} - {end}  {title}{suffix}"
+
+
+def format_today_schedule(
+    events: list[dict[str, Any]],
+    trips: list[dict[str, Any]] | None = None,
+    errors: list[dict[str, Any]] | None = None,
+) -> str:
+    """Format today's schedule query."""
+    trips = trips or []
+    lines = ["高先生，今天我帮您看了一下安排 🌤️", ""]
+    if events:
+        lines.extend(_schedule_item_line(event) for event in events)
+    else:
+        lines.append("今天暂时没有查到明确日程。")
+    if trips:
+        lines.extend(["", "另外，今天相关出行："])
+        lines.extend(f"- {_trip_short_line(trip)}" for trip in trips)
+    else:
+        lines.extend(["", "另外，今天没有新的出差安排。"])
+    lines.extend(_schedule_error_note(errors))
+    return "\n".join(lines)
+
+
+def format_tomorrow_schedule(
+    events: list[dict[str, Any]],
+    trips: list[dict[str, Any]] | None = None,
+    errors: list[dict[str, Any]] | None = None,
+) -> str:
+    """Format tomorrow's schedule query."""
+    trips = trips or []
+    lines = ["高先生，明天我帮您看了一下安排 🌤️", ""]
+    if events:
+        lines.extend(_schedule_item_line(event) for event in events)
+    else:
+        lines.append("明天暂时没有查到明确日程。")
+    if trips:
+        lines.extend(["", "明天相关出行："])
+        lines.extend(f"- {_trip_short_line(trip)}" for trip in trips)
+    else:
+        lines.extend(["", "另外，明天没有新的出差安排。"])
+    if events:
+        lines.extend(["", "我建议您按第一场安排倒推出门时间，会更从容。"])
+    lines.extend(_schedule_error_note(errors))
+    return "\n".join(lines)
+
+
+def _trip_summary_lines(trip: dict[str, Any]) -> list[str]:
+    lines = [_trip_short_line(trip)]
+    linked = trip.get("linked_flights") if isinstance(trip.get("linked_flights"), dict) else {}
+    outbound = linked.get("outbound")
+    return_flight = linked.get("return")
+    if isinstance(outbound, dict):
+        lines.append(f"  去程航班已关联飞行计划：{clean_text(outbound.get('flight_no'))}")
+    for order in trip.get("orders", []):
+        if not isinstance(order, dict) or order.get("confirmation_status") == "date_conflict":
+            continue
+        fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+        if order.get("order_type") == "hotel":
+            lines.append(f"  入住：{clean_text(fields.get('hotel_name')) or '酒店'}")
+        if order.get("order_type") == "train":
+            lines.append(f"  高铁：{clean_text(fields.get('train_no'))} {clean_text(fields.get('departure_station'))} → {clean_text(fields.get('arrival_station'))}")
+    for event in trip.get("events", []):
+        if not isinstance(event, dict):
+            continue
+        if clean_text(event.get("event_type")) == "meeting_placeholder":
+            location = clean_text(event.get("location")) or "待补地点"
+            lines.append(f"  客户拜访：{location}")
+    if isinstance(return_flight, dict):
+        lines.append(f"  返程航班已关联飞行计划：{clean_text(return_flight.get('flight_no'))}")
+    missing = format_trip_missing_items(trip)
+    if missing != "暂无明显待确认事项。":
+        lines.append("  待确认：" + "；".join(line.lstrip("- ") for line in missing.splitlines()))
+    return lines
+
+
+def format_trip_summary(
+    trips: list[dict[str, Any]],
+    query_text: str = "",
+    errors: list[dict[str, Any]] | None = None,
+) -> str:
+    """Format Trip-oriented schedule query."""
+    city = ""
+    for candidate in ("北京", "上海", "广州", "深圳", "杭州", "南京", "长沙", "成都", "重庆", "西安", "厦门", "香港", "东京"):
+        if candidate in query_text:
+            city = candidate
+            break
+    title = f"高先生，{city}这趟出差目前是这样 ✈️" if city else "高先生，我帮您把出行安排过了一遍 ✈️"
+    lines = [title, ""]
+    if trips:
+        for index, trip in enumerate(trips, start=1):
+            trip_lines = _trip_summary_lines(trip)
+            lines.append(f"{index}. {trip_lines[0]}")
+            lines.extend(trip_lines[1:])
+            if index != len(trips):
+                lines.append("")
+        lines.extend(["", "整体我会继续帮您盯着订单和时间。"])
+    else:
+        lines.append("暂时没有查到匹配的出差 Trip。")
+    lines.extend(_schedule_error_note(errors))
+    return "\n".join(lines)
+
+
+def format_week_schedule(
+    events: list[dict[str, Any]],
+    trips: list[dict[str, Any]] | None = None,
+    query_text: str = "",
+    errors: list[dict[str, Any]] | None = None,
+) -> str:
+    """Format week/range schedule query."""
+    trips = trips or []
+    heading = "高先生，这段时间的行程我帮您汇总了一下 📅"
+    if "本周" in query_text or "这周" in query_text:
+        heading = "高先生，本周行程我帮您汇总了一下 📅"
+    elif "下周" in query_text:
+        heading = "高先生，下周行程我帮您汇总了一下 📅"
+    elif "这个月" in query_text or "本月" in query_text:
+        heading = "高先生，这个月的出差和日程我帮您看了一下 📅"
+    lines = [heading, ""]
+    if events:
+        lines.append("日程：")
+        lines.extend(f"- {_schedule_item_line(event)}" for event in events)
+    else:
+        lines.append("暂时没有查到明确日程。")
+    if trips:
+        lines.extend(["", "出行："])
+        lines.extend(f"- {_trip_short_line(trip)}" for trip in trips)
+    lines.extend(_schedule_error_note(errors))
+    return "\n".join(lines)
+
+
 def format_error_friendly(error: Any, context: str | None = None) -> str:
     """Format a concise friendly error without hiding the boundary."""
     prefix = "这边刚才没处理成功"

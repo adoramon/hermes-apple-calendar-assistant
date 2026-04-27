@@ -97,6 +97,16 @@ updated by the dedicated flight location enhancement, and only the original even
 
 ## Query Rules
 
+当用户消息包含“安排”“行程”“出差”“会议”“什么时候去”“还有几个会”等查询意图时，
+优先调用一句话查询路由，不要直接闲聊回答：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/schedule_query_router.py query --text "<用户原文>"
+```
+
+如果返回 `ok=true`，直接使用 `data.summary` 回复。该路由只读 Calendar 和 Trip 草稿，
+不会创建、修改或删除日程。
+
 Before querying, the time range must be clear.
 
 If the user says “今天”, use today from 00:00 to tomorrow 00:00.

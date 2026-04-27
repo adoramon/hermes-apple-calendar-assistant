@@ -259,6 +259,13 @@ to `data/outbox_messages.jsonl` for Hermes Cron delivery. It does not modify
 Calendar or send WeChat directly. See
 [docs/trip-briefing-worker.md](docs/trip-briefing-worker.md).
 
+Phase 54 WeChat schedule query mode: users can ask natural-language questions
+like `我明天什么安排`, `今天还有几个会`, or `下周上海出差怎么样`.
+`schedule_query_router.py query --text "<user text>"` routes the request to
+Calendar and Trip readers, then returns a secretary-style summary. This path is
+read-only and never creates, updates, or deletes Calendar events. See
+[docs/wechat-schedule-query.md](docs/wechat-schedule-query.md).
+
 Delete flow bugfix: deletion requests such as `删除游泳计划` now go through
 `delete_event_flow.py draft` first, then `delete_event_flow.py confirm` after
 explicit confirmation. The confirm step deletes by `calendar + title + start +
