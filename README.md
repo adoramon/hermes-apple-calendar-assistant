@@ -243,6 +243,21 @@ permission / AppleScript / parsing diagnostics. Flight orders still never create
 flight events; they only assist matching `飞行计划`. See
 [docs/trip-plan-order-merge.md](docs/trip-plan-order-merge.md).
 
+Phase 51 WeChat multi-Trip merge validation: when multiple Trip drafts may match
+one hotel/train order, Hermes must list candidate Trips, ask the user to choose,
+then call `trip_aggregator.py add --trip-id <id>` for the selected target. Hotel
+orders replace `hotel_placeholder`, train orders replace outbound/return
+placeholders, date conflicts require follow-up, and flight screenshots still
+only link to `飞行计划`. See
+[docs/trip-merge-wechat-validation.md](docs/trip-merge-wechat-validation.md).
+
+Delete flow bugfix: deletion requests such as `删除游泳计划` now go through
+`delete_event_flow.py draft` first, then `delete_event_flow.py confirm` after
+explicit confirmation. The confirm step deletes by `calendar + title + start +
+end` identity instead of a guessed raw title, so Hermes must not claim deletion
+unless the confirm command returns `ok=true`. See
+[docs/delete-event-flow.md](docs/delete-event-flow.md).
+
 ## Calendar Policy
 
 Read calendars:

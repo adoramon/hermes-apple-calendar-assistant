@@ -116,6 +116,14 @@ Current version: `v2.0-rc local dispatch dry-run`
   日期不一致时标记 `date_conflict` 并等待用户确认；新增
   `docs/trip-plan-order-merge.md`，并为 `flight_plan_reader.py` 增加
   `diagnose --days 30` 诊断输出
+- Phase 51 微信端多 Trip 候选选择与合并实测收口：
+  新增 `docs/trip-merge-wechat-validation.md`，固化多个 Trip 候选时的微信端流程：
+  先列出候选并让用户选择，再使用 `trip_aggregator.py add --trip-id <id>` 合并；
+  记录酒店/高铁替换 placeholder、日期冲突追问、航班只关联 `飞行计划` 的验收标准
+- 删除日程误报修复：
+  新增 `delete_event_flow.py` 和 `docs/delete-event-flow.md`，删除请求先查询候选并生成
+  二次确认草稿，确认后按 `calendar + title + start + end` 精确身份删除，避免
+  “删除游泳计划”这类标题别名导致未删除却回复成功
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

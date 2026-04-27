@@ -335,6 +335,26 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_a
 - 不替换 `meeting_placeholder`。
 - 日期冲突必须询问用户确认，不得直接覆盖。
 
+如果存在多个 Trip 候选，必须先列出候选并询问用户选择，不能自动挑一个合并。
+候选展示需包含 Trip 标题、目的地和日期范围，例如：
+
+```text
+1. 上海商务出行｜5月1日-5月3日
+2. 上海展会行程｜5月2日-5月5日
+```
+
+用户回复“合并到第一个/第二个”后，根据候选序号映射到对应 `trip_id`，再调用
+`trip_aggregator.py add --trip-id <id>`。不得在多候选未确认时创建新 Trip 或合并到
+最近更新的 Trip。
+
+如果酒店订单日期与 Trip 日期不一致，提示：
+
+```text
+这家酒店日期和原出行计划不完全一致，要按酒店订单日期调整 Trip，还是保持原计划？
+```
+
+存在 `date_conflict` 时不得调用 `trip_flow.py confirm` 写入 Calendar。
+
 3. 如果 `order_type` 是 `flight`，只能作为匹配线索：
 
 - 解析航班信息
@@ -635,13 +655,41 @@ Only include flags for fields that should change.
 
 ## Delete Rules
 
-用户要求删除日程时，必须二次确认。确认后再调用：
+用户要求删除日程时，必须先走安全删除流程，不得直接凭用户原话猜标题并宣布删除成功。
+尤其是“删除游泳计划”这类说法，真实标题可能是“游泳”，必须先查询候选并展示草稿。
+
+先调用：
 
 ```bash
-python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/calendar_ops.py delete "<calendar>" "<title>" --yes
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/delete_event_flow.py draft --text "<用户原文>"
 ```
 
-Make clear that v2.0-beta dry-run readiness still deletes the first exact-title match in the target calendar.
+如果返回 `delete_event_not_found`，明确说明没有找到匹配日程，不得说已删除。
+
+如果返回 `delete_event_ambiguous`，展示候选，让用户选择具体哪一条，不得删除。
+
+如果 draft 成功，只能回复草稿中的 `display_message`，等待用户明确回复“确认删除”。
+
+用户确认后再调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/delete_event_flow.py confirm --session-key "<session_key>"
+```
+
+只有 confirm 返回 `ok=true` 后，才允许使用删除成功文案。
+
+底层保留手动精确删除命令，只有在 calendar、title、start、end 均已明确且用户确认后才可使用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/calendar_ops.py delete-exact \
+  "<calendar>" "<title>" \
+  --start "<start_text>" \
+  --end "<end_text>" \
+  --yes
+```
+
+不要再优先使用 `calendar_ops.py delete "<calendar>" "<title>" --yes`，因为它只按标题删除第一条，
+容易在标题别名、同名日程或缺少日期时误判。
 
 ## Upcoming Reminder Scan
 

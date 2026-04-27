@@ -1,6 +1,6 @@
 # 真实订单替换 Trip 计划占位
 
-Status: Phase 50.
+Status: Phase 51 WeChat validation closure.
 
 本阶段用于收口一句话出差模式之后的真实订单合并：用户先说“下周去上海见客户，两天”
 生成计划 Trip，后续再发送真实酒店或高铁订单时，系统应优先替换已有计划占位，而不是
@@ -35,6 +35,17 @@ python3 scripts/trip_aggregator.py add \
 如果 `trip_id` 不存在，返回 `ok=false`。如果订单与 Trip 目的地或日期明显不一致，
 返回 `warning` 和 `needs_confirmation=true`，不得自动创建新 Trip。
 
+微信端多候选时必须先列出候选，例如：
+
+```text
+1. 上海商务出行｜5月1日-5月3日
+2. 上海展会行程｜5月2日-5月5日
+```
+
+用户回复“合并到第一个”后，才把第一个候选映射为 `trip_id` 并调用
+`trip_aggregator.py add --trip-id <id>`。多候选未确认前，不得自动选择最近更新 Trip，
+也不得新建重复 Trip。
+
 ## 字段约定
 
 placeholder 和真实订单会标记：
@@ -63,6 +74,12 @@ Trip 增加 `merge_history`，每次替换记录：
 
 存在 `date_conflict` 时，`trip_flow.py confirm` 不应继续写入 Calendar；必须先处理
 冲突，避免把错误的计划占位或真实订单写进日历。
+
+微信端追问建议：
+
+```text
+这家酒店日期和原出行计划不完全一致，要按酒店订单日期调整 Trip，还是保持原计划？
+```
 
 高铁真实路线如果无法判断是去程或返程，也不得替换去程/返程占位；应返回 warning，
 让用户确认。

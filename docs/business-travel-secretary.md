@@ -139,6 +139,10 @@ python3 scripts/trip_aggregator.py add --trip-id <id> --text "<订单文字>"
 酒店替换 `hotel_placeholder`，高铁按方向替换 `outbound_placeholder` 或
 `return_placeholder`；日期冲突标记为 `date_conflict`，不得直接覆盖。
 
+多候选微信端验收见 `docs/trip-merge-wechat-validation.md`。标准行为是先列出候选
+Trip，等待用户说“合并到第一个/第二个”，再把对应 `trip_id` 传给
+`trip_aggregator.py add --trip-id`；不得自动合并到最近更新的 Trip。
+
 5. 展示统一行程草稿：
 
 ```bash

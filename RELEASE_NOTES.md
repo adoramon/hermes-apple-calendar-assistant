@@ -460,6 +460,42 @@ Apple Calendar
   不写 `飞行计划`、不创建航班事件、不删除旧日程、不覆盖真实确认事件、不跳过确认、
   不请求外部网络、不写 Apple Reminders。
 
+### Phase 51 WeChat Multi-Trip Merge Validation Closure
+
+- 新增文档：`docs/trip-merge-wechat-validation.md`。
+- 固化微信端标准测试流程：
+  用户先创建两个上海 Trip 草稿，后续发送酒店/高铁订单时，Hermes 必须检测多个候选、
+  列出候选 Trip，并询问用户合并到哪一个。
+- 明确选择后行为：
+  用户说“合并到第一个”后，必须调用 `trip_aggregator.py add --trip-id <id>`，
+  再调用 `trip_flow.py draft` 展示合并结果。
+- 记录替换验收：
+  酒店订单替换 `hotel_placeholder`；高铁按方向替换 `outbound_placeholder` 或
+  `return_placeholder`；不得替换 `meeting_placeholder`。
+- 记录航班边界：
+  机票截图只解析并尝试关联 `飞行计划`，不得创建航班日程，不得写入
+  `商务计划`、`个人计划` 或 `夫妻计划`。
+- 记录日期冲突：
+  酒店订单日期与 Trip 日期不一致时标记 `date_conflict`，不自动替换，并追问用户按
+  酒店日期调整 Trip 还是保持原计划。
+- 记录日志关键字、成功判断标准和失败排查：
+  包括 `travel_order_parser.py parse`、`trip_aggregator.py add --trip-id`、
+  `trip_flow.py draft`、`flight_plan_reader.py diagnose`、`trip_flight_matcher.py match`。
+
+### Delete Event Flow False-positive Fix
+
+- 新增 `scripts/delete_event_flow.py`：
+  自然语言删除请求先查询候选并生成删除草稿，用户明确确认后再执行删除。
+- `calendar_ops.py` 增加 `delete_event_exact_identity()` 和 CLI `delete-exact`：
+  按 `calendar + title + start + end` 精确身份删除，避免只按裸标题删除第一条。
+- `SKILL.md` 更新：
+  删除请求必须走 `delete_event_flow.py draft` -> `confirm`；没有找到或多候选时不得回复
+  “已删除”；只有 confirm 返回 `ok=true` 才能使用删除成功文案。
+- 新增文档：`docs/delete-event-flow.md`。
+- 修复场景：
+  用户说“删除游泳计划”，真实标题是“游泳”时，系统会先展示候选草稿，不再凭
+  “游泳计划”这个原始标题直接误报删除成功。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：
