@@ -409,6 +409,38 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_f
 14. 真实订单替换计划占位后，写入 Calendar 前仍必须展示 Trip 草稿并等待用户确认。
 15. 存在 `date_conflict` 时不得调用 confirm 继续写入；必须先让用户确认它属于同一次出行。
 
+### Trip Briefing Rules
+
+Trip briefing 是出差/旅行摘要提醒，不是普通日程写入。
+
+当用户问：
+
+- “我明天出差安排是什么”
+- “明天上海行程帮我过一下”
+- “出发前提醒我一下这趟行程”
+
+可调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_briefing_worker.py scan --hours 48
+```
+
+如果用户要查看某个具体 Trip 草稿，也可以调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_flow.py draft --trip-id "<trip_id>"
+```
+
+Trip briefing worker 只做摘要并写入 outbox：
+
+- 不修改 Calendar。
+- 不创建日程。
+- 不删除日程。
+- 不请求外部网络。
+- 不读取微信 token。
+- 不直连微信。
+- 由 Hermes Cron bridge 统一推送。
+
 ### WeChat Trip Validation
 
 微信端连续发送多张出行订单截图时，标准流程必须是：

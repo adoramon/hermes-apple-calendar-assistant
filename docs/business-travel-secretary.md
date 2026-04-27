@@ -14,6 +14,11 @@ Phase 49 明确航班由航旅纵横统一管理，并自动写入 Apple Calenda
 本项目只读取和关联 `飞行计划` 中的航班，不创建航班日程，也不把机票订单重复写入
 `商务计划`、`个人计划` 或 `夫妻计划`。
 
+Phase 52 新增 Trip 行前摘要：`trip_briefing_worker.py` 会扫描未来 24-48 小时内
+开始的 Trip，生成目的地、交通、酒店、拜访/会议、返程、待确认事项和出发建议摘要，
+写入 Hermes outbox，由现有 Cron bridge 推送微信。该功能只写 outbox，不修改
+Calendar。
+
 ## 一句话出差模式
 
 当用户只说自然语言意图、还没有订单时，先调用：
@@ -74,6 +79,40 @@ python3 scripts/trip_planner.py confirm --trip-id <id>
 - notes 说明“由一句话出差模式生成，交通/酒店信息待订单确认”。
 - 不写 `飞行计划`。
 - 不写 Apple Reminders。
+
+## Trip 行前摘要
+
+手动扫描：
+
+```bash
+python3 scripts/trip_briefing_worker.py scan --hours 48
+```
+
+适用场景：
+
+- 用户问“我明天出差安排是什么”。
+- 用户问“明天上海行程帮我过一下”。
+- 系统需要在出发前通过 outbox 推送一条微信摘要。
+
+摘要内容包括：
+
+- 出行目的地和时间。
+- 去程航班/高铁。
+- 酒店入住。
+- 客户拜访或会议。
+- 返程。
+- 待确认事项。
+- 出发前建议。
+
+安全边界：
+
+- 不修改 Calendar。
+- 不创建或删除日程。
+- 不请求外部网络。
+- 不读取微信 token。
+- 不直连微信。
+- 只写 `data/outbox_messages.jsonl`。
+- 幂等状态记录在 `data/trip_briefing_seen.json`。
 
 一句话模式失败排查：
 

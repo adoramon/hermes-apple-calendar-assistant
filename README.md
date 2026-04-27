@@ -251,6 +251,14 @@ placeholders, date conflicts require follow-up, and flight screenshots still
 only link to `飞行计划`. See
 [docs/trip-merge-wechat-validation.md](docs/trip-merge-wechat-validation.md).
 
+Phase 52 Trip briefing worker: `trip_briefing_worker.py scan --hours 48`
+generates pre-trip briefing messages for draft/confirmed Trips that start soon.
+It summarizes destination, outbound transport, hotel, meetings, return transport,
+pending items, and departure suggestions, then writes a `trip_briefing` message
+to `data/outbox_messages.jsonl` for Hermes Cron delivery. It does not modify
+Calendar or send WeChat directly. See
+[docs/trip-briefing-worker.md](docs/trip-briefing-worker.md).
+
 Delete flow bugfix: deletion requests such as `删除游泳计划` now go through
 `delete_event_flow.py draft` first, then `delete_event_flow.py confirm` after
 explicit confirmation. The confirm step deletes by `calendar + title + start +

@@ -120,6 +120,10 @@ Current version: `v2.0-rc local dispatch dry-run`
   新增 `docs/trip-merge-wechat-validation.md`，固化多个 Trip 候选时的微信端流程：
   先列出候选并让用户选择，再使用 `trip_aggregator.py add --trip-id <id>` 合并；
   记录酒店/高铁替换 placeholder、日期冲突追问、航班只关联 `飞行计划` 的验收标准
+- Phase 52 出差行程摘要日报 / 行前提醒：
+  新增 `trip_briefing_worker.py`、`data/trip_briefing_seen.json` 和
+  `docs/trip-briefing-worker.md`，扫描未来 24-48 小时内的 Trip，生成行前摘要并写入
+  Hermes outbox；只写 outbox，不修改 Calendar、不直连微信
 - 删除日程误报修复：
   新增 `delete_event_flow.py` 和 `docs/delete-event-flow.md`，删除请求先查询候选并生成
   二次确认草稿，确认后按 `calendar + title + start + end` 精确身份删除，避免

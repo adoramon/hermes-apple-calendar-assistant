@@ -618,6 +618,228 @@ def format_trip_flight_pending_sync(trip: dict[str, Any]) -> str:
     )
 
 
+def _briefing_date(value: Any) -> str:
+    parsed = parse_datetime(value)
+    if parsed is None and isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value + "T00:00:00")
+        except ValueError:
+            parsed = None
+    if parsed is None:
+        return clean_text(value)
+    return f"{parsed.month}月{parsed.day}日"
+
+
+def _briefing_flight_lines(flight: dict[str, Any], label: str) -> list[str]:
+    flight_no = clean_text(flight.get("flight_no"))
+    dep = clean_text(flight.get("departure_airport")) or clean_text(flight.get("departure_city"))
+    dep_terminal = clean_text(flight.get("departure_terminal"))
+    arr = clean_text(flight.get("arrival_airport")) or clean_text(flight.get("arrival_city"))
+    arr_terminal = clean_text(flight.get("arrival_terminal"))
+    route = f"{dep}{dep_terminal} → {arr}{arr_terminal}".strip(" →")
+    detail = f"{flight_no} {route}".strip()
+    lines = [f"✈️ {label}", f"   {detail}" if detail else "   航班待确认"]
+    time_text = format_time_range(flight.get("start"), flight.get("end"))
+    if time_text:
+        lines.append(f"   {time_text}")
+    lines.append("   来源：飞行计划")
+    return lines
+
+
+def _briefing_train_lines(order: dict[str, Any], label: str) -> list[str]:
+    fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+    train_no = clean_text(fields.get("train_no"))
+    dep = clean_text(fields.get("departure_station"))
+    arr = clean_text(fields.get("arrival_station"))
+    detail = f"{train_no} {dep} → {arr}".strip()
+    lines = [f"🚄 {label}", f"   {detail}" if detail else "   高铁待确认"]
+    time_text = format_time_range(fields.get("departure_datetime"), fields.get("arrival_datetime"))
+    if time_text:
+        lines.append(f"   {time_text}")
+    return lines
+
+
+def _briefing_hotel_lines(order: dict[str, Any]) -> list[str]:
+    fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+    lines = ["🏨 酒店", f"   {clean_text(fields.get('hotel_name')) or '酒店待确认'}"]
+    checkin = f"{_briefing_date(fields.get('checkin_date'))} {clean_text(fields.get('checkin_time'))}".strip()
+    checkout = f"{_briefing_date(fields.get('checkout_date'))} {clean_text(fields.get('checkout_time') or '12:00')}".strip()
+    if checkin:
+        lines.append(f"   入住：{checkin}")
+    if checkout:
+        lines.append(f"   离店：{checkout}")
+    address = clean_text(fields.get("address"))
+    if address:
+        lines.append(f"   地址：{address}")
+    return lines
+
+
+def _briefing_event_lines(event: dict[str, Any]) -> list[str]:
+    event_type = clean_text(event.get("event_type"))
+    if event_type == "meeting_placeholder":
+        label = "🤝 客户拜访"
+    elif event_type == "hotel_placeholder":
+        label = "🏨 住宿计划"
+    elif event_type == "outbound_placeholder":
+        label = "🚄/✈️ 去程计划"
+    elif event_type == "return_placeholder":
+        label = "🚄/✈️ 返程计划"
+    else:
+        label = f"{_trip_event_icon(event)} {clean_text(event.get('title')) or '行程'}"
+    lines = [label]
+    time_text = format_time_range(event.get("start"), event.get("end"))
+    if time_text:
+        lines.append(f"   {time_text}")
+    location = clean_text(event.get("location"))
+    lines.append(f"   {location or '地点待确认'}")
+    return lines
+
+
+def _trip_briefing_sections(trip: dict[str, Any]) -> list[list[str]]:
+    sections: list[list[str]] = []
+    linked = trip.get("linked_flights") if isinstance(trip.get("linked_flights"), dict) else {}
+    outbound_flight = linked.get("outbound")
+    return_flight = linked.get("return")
+    if isinstance(outbound_flight, dict):
+        sections.append(_briefing_flight_lines(outbound_flight, "去程"))
+
+    train_orders = [
+        order
+        for order in trip.get("orders", [])
+        if isinstance(order, dict)
+        and order.get("order_type") == "train"
+        and order.get("confirmation_status") != "date_conflict"
+    ]
+    hotel_orders = [
+        order
+        for order in trip.get("orders", [])
+        if isinstance(order, dict)
+        and order.get("order_type") == "hotel"
+        and order.get("confirmation_status") != "date_conflict"
+    ]
+    for order in train_orders:
+        replaced = clean_text(order.get("replaced_placeholder_id"))
+        if "outbound" in replaced:
+            sections.append(_briefing_train_lines(order, "去程"))
+    if hotel_orders:
+        sections.append(_briefing_hotel_lines(hotel_orders[0]))
+
+    for event in trip.get("events", []):
+        if not isinstance(event, dict):
+            continue
+        event_type = clean_text(event.get("event_type"))
+        if event.get("confirmation_status") == "confirmed" and event.get("replaced_by_order_hash"):
+            continue
+        if event_type in {"meeting_placeholder", "leisure_placeholder"}:
+            sections.append(_briefing_event_lines(event))
+
+    if isinstance(return_flight, dict):
+        sections.append(_briefing_flight_lines(return_flight, "返程"))
+    for order in train_orders:
+        replaced = clean_text(order.get("replaced_placeholder_id"))
+        if "return" in replaced:
+            sections.append(_briefing_train_lines(order, "返程"))
+
+    for event in trip.get("events", []):
+        if not isinstance(event, dict):
+            continue
+        event_type = clean_text(event.get("event_type"))
+        if event.get("confirmation_status") == "confirmed" and event.get("replaced_by_order_hash"):
+            continue
+        if event_type in {"outbound_placeholder", "return_placeholder", "hotel_placeholder"}:
+            has_hotel = event_type == "hotel_placeholder" and bool(hotel_orders)
+            has_outbound = event_type == "outbound_placeholder" and (
+                isinstance(outbound_flight, dict)
+                or any("outbound" in clean_text(order.get("replaced_placeholder_id")) for order in train_orders)
+            )
+            has_return = event_type == "return_placeholder" and (
+                isinstance(return_flight, dict)
+                or any("return" in clean_text(order.get("replaced_placeholder_id")) for order in train_orders)
+            )
+            if not (has_hotel or has_outbound or has_return):
+                sections.append(_briefing_event_lines(event))
+    return sections
+
+
+def format_trip_missing_items(trip: dict[str, Any]) -> str:
+    """Format pending items for a Trip briefing."""
+    items: list[str] = []
+    linked = trip.get("linked_flights") if isinstance(trip.get("linked_flights"), dict) else {}
+    orders = [order for order in trip.get("orders", []) if isinstance(order, dict)]
+    events = [event for event in trip.get("events", []) if isinstance(event, dict)]
+    if trip.get("needs_flight", True) and not isinstance(linked.get("outbound"), dict):
+        has_outbound_train = any("outbound" in clean_text(order.get("replaced_placeholder_id")) for order in orders)
+        if not has_outbound_train:
+            items.append("去程交通还没确认到真实订单或飞行计划。")
+    if trip.get("needs_flight", True) and not isinstance(linked.get("return"), dict):
+        has_return_train = any("return" in clean_text(order.get("replaced_placeholder_id")) for order in orders)
+        if not has_return_train:
+            items.append("返程交通还没确认到真实订单或飞行计划。")
+    has_hotel = any(order.get("order_type") == "hotel" and order.get("confirmation_status") != "date_conflict" for order in orders)
+    if trip.get("needs_hotel", False) and not has_hotel:
+        items.append("酒店订单还没确认。")
+    for event in events:
+        if clean_text(event.get("event_type")) == "meeting_placeholder" and not clean_text(event.get("location")):
+            items.append("客户拜访地点还没补充。")
+    for order in orders:
+        if order.get("order_type") == "hotel":
+            fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+            if not clean_text(fields.get("phone")):
+                items.append("酒店电话未记录。")
+        if order.get("confirmation_status") == "date_conflict":
+            items.append("有订单日期冲突待确认。")
+    if not items:
+        return "暂无明显待确认事项。"
+    return "\n".join(f"- {item}" for item in dict.fromkeys(items))
+
+
+def format_trip_departure_suggestion(trip: dict[str, Any]) -> str:
+    """Format practical pre-departure suggestions."""
+    suggestions = ["提前检查身份证件和充电器。"]
+    if trip.get("flight_link_status") in {"outbound_linked", "fully_linked"}:
+        suggestions.append("出发前看一眼航旅纵横，确认登机口和航班状态。")
+    else:
+        suggestions.append("出发前确认交通订单和出发站/机场。")
+    if trip.get("needs_hotel", False):
+        suggestions.append("酒店入住信息可以提前截屏备用。")
+    return "\n".join(f"- {item}" for item in suggestions)
+
+
+def format_trip_briefing(trip: dict[str, Any], briefing_type: str) -> str:
+    """Format a pre-trip briefing message."""
+    destination = clean_text(trip.get("destination_city")) or "这次"
+    purpose = clean_text(trip.get("purpose")) or "出行安排"
+    start = _briefing_date(trip.get("start_date"))
+    end = _briefing_date(trip.get("end_date"))
+    heading = {
+        "pre_trip_48h": f"高先生，接下来这趟{destination}出行我先帮您过一遍 ✈️",
+        "pre_trip_24h": f"高先生，明天这趟{destination}出差我帮您整理好了 ✈️",
+        "travel_day_morning": f"高先生，今天这趟{destination}出行我帮您再确认一下 ✈️",
+    }.get(briefing_type, f"高先生，这趟{destination}出行我帮您整理好了 ✈️")
+    lines = [
+        heading,
+        "",
+        f"📍 目的地：{destination}",
+        f"📅 时间：{start} - {end}" if end else f"📅 时间：{start}",
+        f"🎯 目的：{purpose}",
+        "",
+        "行程安排：",
+    ]
+    sections = _trip_briefing_sections(trip)
+    if sections:
+        for index, section in enumerate(sections, start=1):
+            lines.append(f"{index}. {section[0]}")
+            lines.extend(section[1:])
+            if index != len(sections):
+                lines.append("")
+    else:
+        lines.append("暂无可整理的确认行程，我会继续留意订单和计划草稿。")
+    lines.extend(["", "我这边还看到这些待确认事项：", format_trip_missing_items(trip)])
+    lines.extend(["", "出发前建议：", format_trip_departure_suggestion(trip)])
+    lines.extend(["", "我会继续替您盯着时间 ⏰"])
+    return "\n".join(lines)
+
+
 def _travel_label_date(value: Any) -> str:
     parsed = parse_datetime(value)
     if parsed is None and isinstance(value, str):

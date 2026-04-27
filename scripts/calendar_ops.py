@@ -80,9 +80,9 @@ def _parse_datetime(value: datetime | date | str | None) -> datetime | None:
 
 
 def _apple_date_assignment(var_name: str, value: datetime) -> str:
-    # Numeric date strings avoid AppleScript month constant parsing issues on
-    # non-English macOS locales.
-    return f'set {var_name} to date "{value:%Y-%m-%d %H:%M:%S}"'
+    # Use a numeric date literal that Calendar.app can parse without English
+    # month constants on this Chinese macOS deployment.
+    return f'set {var_name} to date "{value:%Y年%-m月%-d日 %H:%M:%S}"'
 
 
 def _run_osascript(script: str) -> tuple[bool, str, str | None]:
@@ -483,6 +483,64 @@ end tell
     )
 
 
+def delete_event_exact_identity(calendar_name: str, title: str, start_text: str, end_text: str) -> dict[str, Any]:
+    """Delete one event by exact title+start+end identity."""
+    if not calendar_name:
+        return _result(False, error="calendar_name is required.")
+    if not title:
+        return _result(False, error="title is required.")
+    if not start_text or not end_text:
+        return _result(False, error="start_text and end_text are required.")
+
+    calendar_name_escaped = _escape_applescript_text(calendar_name)
+    title_escaped = _escape_applescript_text(title)
+    start_text_escaped = _escape_applescript_text(start_text)
+    end_text_escaped = _escape_applescript_text(end_text)
+    script = f"""
+tell application "Calendar"
+    set targetCalendar to calendar "{calendar_name_escaped}"
+    set matches to events of targetCalendar whose summary is "{title_escaped}"
+    set matchedCount to 0
+    set targetEvent to missing value
+    repeat with ev in matches
+        set f2 to (start date of ev) as text
+        set f3 to (end date of ev) as text
+        if f2 is "{start_text_escaped}" and f3 is "{end_text_escaped}" then
+            set matchedCount to matchedCount + 1
+            set targetEvent to ev
+        end if
+    end repeat
+    if matchedCount is 0 then
+        return "NOT_FOUND"
+    end if
+    if matchedCount is greater than 1 then
+        return "AMBIGUOUS"
+    end if
+    set deletedTitle to summary of targetEvent as text
+    delete targetEvent
+    return deletedTitle
+end tell
+""".strip()
+
+    ok, stdout, error = _run_osascript(script)
+    if not ok:
+        return _result(False, error=error)
+    if stdout == "NOT_FOUND":
+        return _result(False, error="No event found with the exact title/start/end identity.")
+    if stdout == "AMBIGUOUS":
+        return _result(False, error="Multiple events matched the same title/start/end identity.")
+    return _result(
+        True,
+        data={
+            "deleted_title": stdout,
+            "calendar": calendar_name,
+            "start": start_text,
+            "end": end_text,
+            "display_message": assistant_persona.format_calendar_deleted({"title": stdout, "calendar": calendar_name}),
+        },
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Debug Apple Calendar operations.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -515,6 +573,12 @@ def _build_parser() -> argparse.ArgumentParser:
     delete.add_argument("calendar_name")
     delete.add_argument("title")
     delete.add_argument("--yes", action="store_true", help="Required to confirm deletion.")
+    delete_exact = subparsers.add_parser("delete-exact", help="Delete one exact title/start/end match.")
+    delete_exact.add_argument("calendar_name")
+    delete_exact.add_argument("title")
+    delete_exact.add_argument("--start", required=True)
+    delete_exact.add_argument("--end", required=True)
+    delete_exact.add_argument("--yes", action="store_true", help="Required to confirm deletion.")
 
     update_location = subparsers.add_parser(
         "update-location-exact",
@@ -561,6 +625,11 @@ def main(argv: list[str] | None = None) -> int:
             result = _result(False, error="Refusing to delete without --yes.")
         else:
             result = delete_event(args.calendar_name, args.title)
+    elif args.command == "delete-exact":
+        if not args.yes:
+            result = _result(False, error="Refusing to delete without --yes.")
+        else:
+            result = delete_event_exact_identity(args.calendar_name, args.title, args.start, args.end)
     elif args.command == "update-location-exact":
         result = update_event_location_exact(
             args.calendar_name,

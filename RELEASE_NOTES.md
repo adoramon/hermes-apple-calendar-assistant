@@ -482,6 +482,22 @@ Apple Calendar
   包括 `travel_order_parser.py parse`、`trip_aggregator.py add --trip-id`、
   `trip_flow.py draft`、`flight_plan_reader.py diagnose`、`trip_flight_matcher.py match`。
 
+### Phase 52 Trip Briefing Worker
+
+- 新增 `scripts/trip_briefing_worker.py`：
+  扫描未来 `--hours` 小时内开始的 Trip，生成行前摘要，并写入 Hermes outbox。
+- 新增 `data/trip_briefing_seen.json`：
+  使用 `<trip_id>|<briefing_type>` 幂等，避免同一 Trip 同一类型 briefing 重复发送。
+- 新增文档：`docs/trip-briefing-worker.md`。
+- `assistant_persona.py` 新增：
+  `format_trip_briefing`、`format_trip_missing_items`、
+  `format_trip_departure_suggestion`。
+- outbox metadata：
+  `type=trip_briefing`、`trip_id=<id>`、`briefing_type=pre_trip_24h|pre_trip_48h|travel_day_morning`。
+- 安全边界：
+  不修改 Calendar、不创建日程、不删除日程、不请求外部网络、不读取微信 token、
+  不直连微信，只写 outbox，由 Hermes Cron bridge 统一推送。
+
 ### Delete Event Flow False-positive Fix
 
 - 新增 `scripts/delete_event_flow.py`：
