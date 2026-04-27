@@ -124,6 +124,10 @@ Current version: `v2.0-rc local dispatch dry-run`
   新增 `trip_briefing_worker.py`、`data/trip_briefing_seen.json` 和
   `docs/trip-briefing-worker.md`，扫描未来 24-48 小时内的 Trip，生成行前摘要并写入
   Hermes outbox；只写 outbox，不修改 Calendar、不直连微信
+- Phase 53 Trip Briefing 定时推送接入：
+  新增 `deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist`，
+  提供每 30 分钟运行 `trip_briefing_worker.py scan --hours 48` 的用户级 launchd
+  模板；不自动安装，只记录安装、卸载、日志和完整 outbox 推送链路
 - 删除日程误报修复：
   新增 `delete_event_flow.py` 和 `docs/delete-event-flow.md`，删除请求先查询候选并生成
   二次确认草稿，确认后按 `calendar + title + start + end` 精确身份删除，避免

@@ -433,6 +433,8 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_f
 
 Trip briefing worker 只做摘要并写入 outbox：
 
+- Trip briefing 是行前摘要，不应替代单个日程提醒；单个会议/日程提醒仍由 `reminder_worker.py` 处理。
+- 用户问“明天出差安排”时，应优先展示 Trip briefing 风格摘要。
 - 不修改 Calendar。
 - 不创建日程。
 - 不删除日程。

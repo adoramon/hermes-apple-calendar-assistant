@@ -558,6 +558,33 @@ tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/remin
 tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.err.log
 ```
 
+Trip briefing can also run as a launchd task. It scans every 30 minutes and
+writes whole-trip briefing messages to the same outbox:
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist
+```
+
+The full Trip briefing reminder path is:
+
+```text
+Apple Calendar / data/trip_drafts.json
+  -> trip_briefing_worker.py scan --hours 48
+  -> data/outbox_messages.jsonl
+  -> Hermes Cron bridge
+  -> 微信
+```
+
+Logs:
+
+```bash
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/trip_briefing_worker.out.log
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/trip_briefing_worker.err.log
+```
+
 Hermes can inspect pending outbox messages with:
 
 ```bash

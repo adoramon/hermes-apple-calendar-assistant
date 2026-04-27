@@ -498,6 +498,23 @@ Apple Calendar
   不修改 Calendar、不创建日程、不删除日程、不请求外部网络、不读取微信 token、
   不直连微信，只写 outbox，由 Hermes Cron bridge 统一推送。
 
+### Phase 53 Trip Briefing Scheduled Push Integration
+
+- 新增 launchd 模板：
+  `deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist`。
+- 模板行为：
+  每 30 分钟运行 `/usr/bin/python3 scripts/trip_briefing_worker.py scan --hours 48`，
+  工作目录为 `/Users/administrator/Code/hermes-apple-calendar-assistant`。
+- 日志：
+  `logs/trip_briefing_worker.out.log` 和 `logs/trip_briefing_worker.err.log`。
+- 文档更新：
+  `docs/trip-briefing-worker.md` 增加安装、卸载、查看日志、手动运行、
+  查看/重置 `trip_briefing_seen.json`，并说明与 `reminder_worker` 的区别。
+- README 和 Hermes profile 文档补充完整链路：
+  `Apple Calendar / trip_drafts.json -> trip_briefing_worker -> outbox_messages.jsonl -> Hermes Cron bridge -> 微信`。
+- 安全边界：
+  不自动安装 launchd，不改 Calendar，不创建/删除日程，不请求外网，不读微信 token，只写 outbox。
+
 ### Delete Event Flow False-positive Fix
 
 - 新增 `scripts/delete_event_flow.py`：

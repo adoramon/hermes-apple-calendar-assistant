@@ -165,6 +165,64 @@ python3 scripts/hermes_outbox_cli.py pending --limit 10
 Hermes 应展示 pending messages，但不要自动标记为 `sent_dry_run`；只有用户明确确认
 已处理指定 record id 后，才调用 `mark-dry-run-sent`。
 
+## 启用 Trip Briefing launchd
+
+`trip_briefing_worker.py` 是整趟出行摘要 Worker。它读取 `data/trip_drafts.json`，
+为未来 24-48 小时内开始的 Trip 生成行前摘要，并写入 `data/outbox_messages.jsonl`。
+它不会真实发送微信、Telegram，也不会访问外部网络。
+
+launchd 模板：
+
+```text
+deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist
+```
+
+该任务每 30 分钟运行一次：
+
+```bash
+python3 scripts/trip_briefing_worker.py scan --hours 48
+```
+
+安装：
+
+```bash
+mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
+mkdir -p ~/Library/LaunchAgents
+cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist
+```
+
+卸载：
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist
+rm ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist
+```
+
+查看日志：
+
+```bash
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/trip_briefing_worker.out.log
+tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/trip_briefing_worker.err.log
+```
+
+完整链路：
+
+```text
+Apple Calendar / trip_drafts.json
+  -> trip_briefing_worker launchd
+  -> outbox_messages.jsonl
+  -> Hermes Cron bridge script
+  -> Hermes Cron Delivery
+  -> Weixin Adapter
+  -> 微信
+```
+
+区别：
+
+- `reminder_worker`：单个日程提醒。
+- `trip_briefing_worker`：整趟出行摘要。
+
 ## 当前真实发送路径
 
 当前配置应保持：
@@ -252,6 +310,7 @@ sunny-wechat-lite cron create "every 5m" \
 ```text
 Apple Calendar
   -> reminder_worker launchd
+  -> trip_briefing_worker launchd
   -> outbox_messages.jsonl
   -> Hermes Cron bridge script
   -> Hermes Cron Delivery

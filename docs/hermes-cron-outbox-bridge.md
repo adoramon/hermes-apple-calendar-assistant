@@ -26,6 +26,21 @@ python3 scripts/hermes_cron_outbox_bridge.py read-pending --limit 5 --mark-sent
 - 默认 `--empty-mode silent`，无 pending 时 stdout 为空，避免无意义通知
 - 仅在传入 `--mark-sent` 时，才把已输出记录标记为 `sent_via_hermes_cron`
 
+outbox 上游可以是：
+
+- `reminder_worker.py`：单个日程提醒。
+- `trip_briefing_worker.py`：整趟出行行前摘要。
+
+Trip briefing 的上游链路：
+
+```text
+Apple Calendar / trip_drafts.json
+  -> trip_briefing_worker
+  -> data/outbox_messages.jsonl
+  -> Hermes Cron bridge
+  -> 微信
+```
+
 可选参数：
 
 ```bash
@@ -162,6 +177,7 @@ sunny-wechat-lite cron create "every 5m" \
 ```text
 Apple Calendar
   -> reminder_worker launchd
+  -> trip_briefing_worker launchd
   -> outbox_messages.jsonl
   -> Hermes Cron bridge script
   -> Hermes Cron Delivery
