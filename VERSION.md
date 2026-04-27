@@ -100,6 +100,11 @@ Current version: `v2.0-rc local dispatch dry-run`
   `docs/travel-intent-planner.md`，支持直接从自然语言出差/旅行意图生成
   Trip planning draft，经用户确认后写入 Apple Calendar；仅生成本地计划草稿，
   不订票、不查价格、不查实时航班、不请求外部网络
+- Phase 48 一句话出差模式微信端实测收口：
+  新增 `docs/travel-intent-wechat-validation.md`，补充标准测试话术、
+  `travel_intent_parser.py parse`、`trip_planner.py draft`、
+  `trip_planner.py set-field`、`trip_planner.py confirm` 日志关键字、
+  三轮微信确认流程、成功判断标准、失败排查和测试数据清理方法
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

@@ -492,6 +492,87 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_p
     `trip_aggregator.py` + `trip_flow.py` 处理真实订单聚合，不把一句话计划草稿当作
     最终真实行程。
 
+### Travel Intent WeChat Validation
+
+微信端标准测试话术：
+
+- `下周去上海见客户，两天`
+- `周五广州出差，当天回`
+- `和太太下月去东京玩五天`
+
+Hermes 预期行为：
+
+1. 调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/travel_intent_parser.py parse "<用户原文>"
+```
+
+2. 调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py draft --text "<用户原文>"
+```
+
+3. 展示计划草稿。
+4. 明确说明这是“计划草稿”，不是实际订单。
+5. 询问是否写入：
+
+- `商务计划`
+- `个人计划`
+- `夫妻计划`
+
+6. 用户选择日历后，必要时调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py set-field \
+  --trip-id "<trip_id>" \
+  --field "calendar" \
+  --value "商务计划"
+```
+
+7. 用户明确确认后，才调用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_planner.py confirm --trip-id "<trip_id>"
+```
+
+预期日志关键字：
+
+- `travel_intent_parser.py parse`
+- `trip_planner.py draft`
+- `trip_planner.py set-field`
+- `trip_planner.py confirm`
+
+微信端三轮测试流程：
+
+1. 用户：`下周去上海见客户，两天`
+   助手：展示计划草稿，说明这是计划草稿、不是实际订单，并询问日历。
+2. 用户：`放到商务计划`
+   助手：更新草稿，继续等待确认。
+3. 用户：`确认写入`
+   助手：调用 `trip_planner.py confirm`，写入 Apple Calendar。
+
+成功判断标准：
+
+- 用户一句话被识别为出行意图。
+- 系统没有直接普通回答。
+- 系统没有请求外网查航班或酒店。
+- 系统没有直接写 Calendar。
+- 写入前展示草稿。
+- 确认后才写入 Apple Calendar。
+- 事件标题带“计划”或“待确认”。
+- notes 说明“由一句话出差模式生成，交通/酒店信息待订单确认”。
+- 不写 `飞行计划`。
+- 不写 Apple Reminders。
+
+失败排查：
+
+- 没进入 `trip_planner`：检查 `SKILL.md` 是否要求 `travel_intent_parser.py` 优先；检查 `gateway.log` 是否出现 parser 调用。
+- 缺少日期：`trip_planner.py` 应追问具体日期或时间范围。
+- 直接写入：属于严重错误，应修正 `SKILL.md`。
+- 去查外网航班/酒店：属于错误，本阶段不允许请求外网。
+
 ## Update Rules
 
 用户要求修改日程时，先识别：

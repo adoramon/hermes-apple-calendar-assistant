@@ -1,6 +1,6 @@
 # Business Travel Secretary
 
-Status: Phase 47 one-sentence travel planning + WeChat validation closure.
+Status: Phase 48 one-sentence travel planning WeChat validation closure.
 
 本阶段把“单个酒店订单写入”升级为“多订单出行聚合”。当用户连续发送机票、酒店、
 高铁订单文字或截图 OCR 文本时，系统应自动整理为一次 Trip，并在确认后一次性写入
@@ -35,6 +35,48 @@ python3 scripts/trip_planner.py draft --text "下周去上海见客户，两天"
 ```bash
 python3 scripts/trip_planner.py confirm --trip-id <id>
 ```
+
+微信端实测标准话术：
+
+- `下周去上海见客户，两天`
+- `周五广州出差，当天回`
+- `和太太下月去东京玩五天`
+
+微信端三轮确认流程：
+
+1. 用户：`下周去上海见客户，两天`
+   助手：展示计划草稿，明确说明这是计划草稿、不是实际订单，并询问日历。
+2. 用户：`放到商务计划`
+   助手：调用 `trip_planner.py set-field` 更新草稿，继续等待确认。
+3. 用户：`确认写入`
+   助手：调用 `trip_planner.py confirm`，写入 Apple Calendar。
+
+一句话模式预期日志关键字：
+
+- `travel_intent_parser.py parse`
+- `trip_planner.py draft`
+- `trip_planner.py set-field`
+- `trip_planner.py confirm`
+
+一句话模式成功判断：
+
+- 用户一句话被识别为出行意图。
+- 系统没有直接普通回答。
+- 系统没有请求外网查航班/酒店。
+- 系统没有直接写 Calendar。
+- 写入前展示草稿。
+- 确认后才写入 Apple Calendar。
+- 事件标题带“计划”或“待确认”。
+- notes 说明“由一句话出差模式生成，交通/酒店信息待订单确认”。
+- 不写 `飞行计划`。
+- 不写 Apple Reminders。
+
+一句话模式失败排查：
+
+- 没进入 `trip_planner`：检查 `SKILL.md` 是否要求 `travel_intent_parser.py` 优先；检查 `gateway.log` 是否出现 parser 调用。
+- 缺少日期：`trip_planner.py` 应追问具体日期或时间范围。
+- 直接写入：属于严重错误，应修正 `SKILL.md`。
+- 去查外网航班/酒店：属于错误，本阶段不允许请求外网。
 
 ## 一句话模式示例
 
@@ -211,6 +253,12 @@ python3 scripts/trip_flow.py cancel --trip-id <trip_id>
 
 ```bash
 python3 scripts/trip_aggregator.py cancel --trip-id <trip_id>
+```
+
+取消一句话出差模式草稿：
+
+```bash
+python3 scripts/trip_planner.py cancel --trip-id <trip_id>
 ```
 
 查看已写入去重记录：

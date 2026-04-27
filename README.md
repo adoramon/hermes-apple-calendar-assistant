@@ -211,6 +211,19 @@ Hermes should hand the same trip back to the Trip Aggregator flow for accurate
 replacement. See [docs/travel-intent-planner.md](docs/travel-intent-planner.md)
 and [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
 
+Phase 48 WeChat validation closure for one-sentence travel planning: the
+expected WeChat flow is now documented as natural-language travel intent ->
+`travel_intent_parser.py parse` -> `trip_planner.py draft` -> plan draft display
+with clear “计划草稿 / 非实际订单” wording -> calendar choice
+(`商务计划` / `个人计划` / `夫妻计划`) -> `trip_planner.py set-field` when needed
+-> explicit user confirmation -> `trip_planner.py confirm` -> Apple Calendar
+write. The validation docs record standard test phrases, log keywords, success
+criteria, failure triage, and cleanup guidance. The flow still must not request
+external flight/hotel data, must not write `飞行计划`, must not write Apple
+Reminders, and must not skip confirmation. See
+[docs/travel-intent-wechat-validation.md](docs/travel-intent-wechat-validation.md)
+and [docs/travel-intent-planner.md](docs/travel-intent-planner.md).
+
 ## Calendar Policy
 
 Read calendars:

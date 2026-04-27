@@ -371,6 +371,46 @@ Apple Calendar
   不订票、不查价格、不查实时航班、不请求外部网络、不写 Apple Reminders、
   不写 `飞行计划`、不直接写入、必须确认、不覆盖已有真实订单行程。
 
+### Phase 48 One-sentence Travel Planning WeChat Validation Closure
+
+- 新增文档：`docs/travel-intent-wechat-validation.md`。
+- 已记录微信端标准测试话术：
+  `下周去上海见客户，两天`、
+  `周五广州出差，当天回`、
+  `和太太下月去东京玩五天`。
+- 已收口微信端标准流程：
+  用户一句话表达出差/旅行意图后，Hermes 应调用
+  `travel_intent_parser.py parse` ->
+  `trip_planner.py draft` ->
+  展示计划草稿 ->
+  明确说明这是计划草稿、不是实际订单 ->
+  询问写入 `商务计划` / `个人计划` / `夫妻计划` ->
+  必要时调用 `trip_planner.py set-field` ->
+  用户确认后调用 `trip_planner.py confirm` ->
+  写入 Apple Calendar。
+- 已记录预期日志关键字：
+  `travel_intent_parser.py parse`、
+  `trip_planner.py draft`、
+  `trip_planner.py set-field`、
+  `trip_planner.py confirm`。
+- 已明确成功判断标准：
+  识别为出行意图；
+  不直接普通回答；
+  不请求外网查航班或酒店；
+  不直接写 Calendar；
+  写入前展示草稿；
+  确认后才写入 Apple Calendar；
+  事件标题带“计划”或“待确认”；
+  notes 说明“由一句话出差模式生成，交通/酒店信息待订单确认”；
+  不写 `飞行计划`；
+  不写 Apple Reminders。
+- 已补充失败排查：
+  未进入 `trip_planner`、缺少日期、直接写入、外网查询航班/酒店。
+- 已补充三轮微信实测流程和清理方法：
+  “下周去上海见客户，两天” -> “放到商务计划” -> “确认写入”，
+  并说明如何查看 `data/trip_drafts.json`、取消 trip draft，以及通过
+  Apple Calendar 或现有安全删除流程清理测试日程。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：
