@@ -28,6 +28,10 @@ python3 scripts/trip_aggregator.py cancel --trip-id <id>
 - 酒店入住日期与交通到达日期接近时合并。
 - 回程交通从目的地返回北京或原出发城市时合并。
 - `source=travel_intent` 的计划 Trip 优先接收后续酒店/高铁/机票线索。
+- 可使用 `trip_aggregator.py add --trip-id <id> --text "<订单文字>"` 显式合并到指定 Trip。
+- 真实酒店订单替换 `hotel_placeholder`，真实高铁订单替换 `outbound_placeholder` 或
+  `return_placeholder`。
+- 日期冲突时标记 `date_conflict`，不直接覆盖计划占位，等待用户确认。
 - `order_type=flight` 不进入待创建事件，只尝试关联 `飞行计划`。
 - 无法判断时创建新 Trip，并由 Hermes 询问用户是否归并。
 
@@ -42,6 +46,7 @@ python3 scripts/trip_aggregator.py cancel --trip-id <id>
   "start_date": "2026-05-01",
   "end_date": "2026-05-03",
   "orders": [],
+  "merge_history": [],
   "linked_flights": {},
   "flight_link_status": "flight_pending_sync",
   "planning_status": "planned_only",

@@ -110,6 +110,12 @@ Current version: `v2.0-rc local dispatch dry-run`
   `docs/trip-flight-plan-merge.md`，从 Apple Calendar `飞行计划` 只读关联航班，
   机票截图只作为匹配线索，不创建航班日程；`trip_flow.py confirm` 只写酒店、
   高铁、客户拜访等非航班事件
+- Phase 50 真实订单替换 Trip 计划占位：
+  增强 `trip_aggregator.py add --trip-id <id>`，真实酒店订单替换
+  `hotel_placeholder`，真实高铁订单替换去程/返程 placeholder；
+  日期不一致时标记 `date_conflict` 并等待用户确认；新增
+  `docs/trip-plan-order-merge.md`，并为 `flight_plan_reader.py` 增加
+  `diagnose --days 30` 诊断输出
 - 当前阶段仍不真实发送 Telegram、微信或任何外部网络请求
 
 ## v2.0.0-alpha

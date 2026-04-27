@@ -234,6 +234,15 @@ must not create duplicate flight events. Hotels, trains, and customer visits
 remain confirmable writes to the selected normal calendar. See
 [docs/trip-flight-plan-merge.md](docs/trip-flight-plan-merge.md).
 
+Phase 50 real-order merge update: real hotel and train orders now replace
+travel-intent Trip placeholders instead of creating duplicate plan items.
+`trip_aggregator.py add --trip-id <id>` can merge an order into an explicitly
+selected Trip, hotel date mismatches are marked `date_conflict` for user
+confirmation, and `flight_plan_reader.py diagnose --days 30` exposes Calendar
+permission / AppleScript / parsing diagnostics. Flight orders still never create
+flight events; they only assist matching `飞行计划`. See
+[docs/trip-plan-order-merge.md](docs/trip-plan-order-merge.md).
+
 ## Calendar Policy
 
 Read calendars:

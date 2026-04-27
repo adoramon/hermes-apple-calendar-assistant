@@ -112,11 +112,50 @@ def list_flights(days: int = 30) -> dict[str, Any]:
     return _result(True, data={"calendar": FLIGHT_CALENDAR, "reader_source": events_source, "flights": flights})
 
 
+def diagnose(days: int = 30) -> dict[str, Any]:
+    if days <= 0:
+        return _result(False, error="days must be greater than 0")
+    now = datetime.now()
+    start = now.isoformat(timespec="seconds")
+    end = (now + timedelta(days=days)).isoformat(timespec="seconds")
+    errors: list[str] = []
+    events_result = calendar_ops.list_events(FLIGHT_CALENDAR, start_date=start, end_date=end)
+    apple_script_ok = bool(events_result.get("ok"))
+    events: list[dict[str, Any]] = []
+    if apple_script_ok:
+        raw_events = events_result.get("data", {}).get("events", [])
+        events = [item for item in raw_events if isinstance(item, dict)]
+    else:
+        errors.append(str(events_result.get("error") or "AppleScript 查询飞行计划失败"))
+
+    parse_success_count = 0
+    parse_failed_count = 0
+    for event in events:
+        if _flight_from_event(event):
+            parse_success_count += 1
+        else:
+            parse_failed_count += 1
+
+    data = {
+        "calendar": FLIGHT_CALENDAR,
+        "calendar_found": apple_script_ok,
+        "permission_ok": apple_script_ok,
+        "apple_script_ok": apple_script_ok,
+        "event_count": len(events),
+        "parse_success_count": parse_success_count,
+        "parse_failed_count": parse_failed_count,
+        "errors": errors,
+    }
+    return _result(True, data=data, error=None if apple_script_ok else errors[0])
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read future flights from 飞行计划.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     list_parser = subparsers.add_parser("list")
     list_parser.add_argument("--days", type=int, default=30)
+    diagnose_parser = subparsers.add_parser("diagnose")
+    diagnose_parser.add_argument("--days", type=int, default=30)
     return parser
 
 
@@ -124,6 +163,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "list":
         result = list_flights(days=args.days)
+    elif args.command == "diagnose":
+        result = diagnose(days=args.days)
     else:
         raise AssertionError(args.command)
     print(json.dumps(result, ensure_ascii=False, indent=2))

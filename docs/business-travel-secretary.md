@@ -129,6 +129,16 @@ python3 scripts/trip_aggregator.py add --text "<订单文字>"
 其中 `flight` 只作为匹配线索：系统尝试从 `飞行计划` 关联对应航班，匹配失败时提示
 等待航旅纵横同步，不创建航班日程。
 
+如果已有一句话计划 Trip，真实酒店/高铁订单应优先替换对应 placeholder；多个候选
+Trip 时让用户选择，并显式指定：
+
+```bash
+python3 scripts/trip_aggregator.py add --trip-id <id> --text "<订单文字>"
+```
+
+酒店替换 `hotel_placeholder`，高铁按方向替换 `outbound_placeholder` 或
+`return_placeholder`；日期冲突标记为 `date_conflict`，不得直接覆盖。
+
 5. 展示统一行程草稿：
 
 ```bash

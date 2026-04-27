@@ -109,6 +109,19 @@ def _matches_trip(trip: dict[str, Any], order: dict[str, Any], destination: str,
     return any(_date_close(item, trip_start.date()) or _date_close(item, trip_end.date()) for item in dates)
 
 
+def _trip_warning(trip: dict[str, Any], order: dict[str, Any], destination: str, dates: list[date]) -> str | None:
+    trip_city = str(trip.get("destination_city") or "")
+    if trip_city and destination and trip_city != destination:
+        return f"订单目的地「{destination}」与 Trip 目的地「{trip_city}」不一致。"
+    trip_start = _parse_dt(trip.get("start_date"))
+    trip_end = _parse_dt(trip.get("end_date"))
+    if trip_start and trip_end and dates:
+        if not any(_date_close(item, trip_start.date()) or _date_close(item, trip_end.date()) for item in dates):
+            order_days = "、".join(item.isoformat() for item in sorted(set(dates)))
+            return f"订单日期（{order_days}）与 Trip 日期（{trip_start.date()} 至 {trip_end.date()}）相差较大。"
+    return None
+
+
 def _matching_trips(trips: dict[str, Any], order: dict[str, Any], destination: str, dates: list[date]) -> list[dict[str, Any]]:
     matches = [
         trip
@@ -121,8 +134,17 @@ def _matching_trips(trips: dict[str, Any], order: dict[str, Any], destination: s
 
 def _update_trip_bounds(trip: dict[str, Any]) -> None:
     dates: list[date] = []
+    for event in trip.get("events", []) if isinstance(trip.get("events"), list) else []:
+        if not isinstance(event, dict):
+            continue
+        for value in (event.get("start"), event.get("end")):
+            parsed = _parse_dt(value)
+            if parsed:
+                dates.append(parsed.date())
     for order in trip.get("orders", []):
         if isinstance(order, dict):
+            if order.get("confirmation_status") == "date_conflict":
+                continue
             dates.extend(_order_dates(order))
     if dates:
         trip["start_date"] = min(dates).isoformat()
@@ -150,12 +172,167 @@ def _ensure_trip_defaults(trip: dict[str, Any]) -> None:
     trip.setdefault("origin_city", "北京")
     trip.setdefault("linked_flights", {})
     trip.setdefault("needs_flight", True)
+    trip.setdefault("orders", [])
+    trip.setdefault("merge_history", [])
+    for index, event in enumerate(trip.get("events", []) if isinstance(trip.get("events"), list) else []):
+        if not isinstance(event, dict):
+            continue
+        event.setdefault("placeholder_id", f"{event.get('event_type') or 'event'}_{index + 1}")
+        if str(event.get("event_type") or "").endswith("_placeholder"):
+            event.setdefault("source_type", "travel_intent")
+            event.setdefault("confirmation_status", "planned")
+        else:
+            event.setdefault("source_type", "manual")
+            event.setdefault("confirmation_status", "confirmed")
+        event.setdefault("replaced_placeholder_id", None)
 
 
-def _handle_flight_order(order: dict[str, Any], destination: str, dates: list[date]) -> dict[str, Any]:
+def _place_matches(place: Any, city: Any) -> bool:
+    place_text = str(place or "")
+    city_text = str(city or "")
+    if not place_text or not city_text:
+        return False
+    return city_text in place_text or place_text in city_text
+
+
+def _route_placeholder_type(trip: dict[str, Any], order: dict[str, Any]) -> str | None:
+    fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+    origin = str(trip.get("origin_city") or "北京")
+    destination = str(trip.get("destination_city") or "")
+    dep = str(fields.get("departure_city") or fields.get("departure_station") or "")
+    arr = str(fields.get("arrival_city") or fields.get("arrival_station") or "")
+    dep_station = str(fields.get("departure_station") or "")
+    arr_station = str(fields.get("arrival_station") or "")
+    if (_place_matches(dep, origin) or _place_matches(dep_station, origin)) and (
+        _place_matches(arr, destination) or _place_matches(arr_station, destination)
+    ):
+        return "outbound_placeholder"
+    if (_place_matches(dep, destination) or _place_matches(dep_station, destination)) and (
+        _place_matches(arr, origin) or _place_matches(arr_station, origin)
+    ):
+        return "return_placeholder"
+    return None
+
+
+def _find_placeholder(trip: dict[str, Any], event_type: str) -> dict[str, Any] | None:
+    for event in trip.get("events", []) if isinstance(trip.get("events"), list) else []:
+        if not isinstance(event, dict):
+            continue
+        if event.get("event_type") != event_type:
+            continue
+        if event.get("confirmation_status") == "confirmed":
+            continue
+        return event
+    return None
+
+
+def _append_merge_history(trip: dict[str, Any], placeholder_type: str, new_source_type: str, summary: str) -> None:
+    trip.setdefault("merge_history", []).append(
+        {
+            "at": util.now_local_iso(),
+            "action": "replace_placeholder",
+            "placeholder_type": placeholder_type,
+            "new_source_type": new_source_type,
+            "summary": summary,
+        }
+    )
+
+
+def _hotel_dates_match_trip(trip: dict[str, Any], order: dict[str, Any]) -> bool:
+    fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+    checkin = _parse_dt(fields.get("checkin_date"))
+    checkout = _parse_dt(fields.get("checkout_date"))
+    trip_start = _parse_dt(trip.get("start_date"))
+    trip_end = _parse_dt(trip.get("end_date"))
+    if not checkin or not checkout or not trip_start or not trip_end:
+        return True
+    return checkin.date() == trip_start.date() and checkout.date() == trip_end.date()
+
+
+def _mark_placeholder_replaced(trip: dict[str, Any], placeholder_type: str, order: dict[str, Any]) -> dict[str, Any] | None:
+    placeholder = _find_placeholder(trip, placeholder_type)
+    if not placeholder:
+        return None
+    placeholder["confirmation_status"] = "confirmed"
+    placeholder["source_type"] = order.get("source_type")
+    placeholder["replaced_by_order_hash"] = order.get("raw_text_hash")
+    placeholder["replaced_at"] = util.now_local_iso()
+    order["replaced_placeholder_id"] = placeholder.get("placeholder_id")
+    return placeholder
+
+
+def _add_order_once(trip: dict[str, Any], order: dict[str, Any]) -> bool:
+    if any(existing.get("raw_text_hash") == order["raw_text_hash"] for existing in trip.get("orders", []) if isinstance(existing, dict)):
+        return False
+    trip.setdefault("orders", []).append(order)
+    return True
+
+
+def _merge_real_order_into_trip(trip: dict[str, Any], order: dict[str, Any], explicit_trip: bool) -> dict[str, Any]:
+    order_type = str(order.get("order_type") or "")
+    order.setdefault("replaced_placeholder_id", None)
+    warning = None
+    needs_confirmation = False
+    replaced_placeholder = None
+
+    if order_type == "hotel":
+        order["source_type"] = "hotel_order"
+        if not _hotel_dates_match_trip(trip, order):
+            order["confirmation_status"] = "date_conflict"
+            warning = "酒店订单日期与当前 Trip 日期不一致，已标记为日期冲突，暂不替换住宿占位。"
+            needs_confirmation = True
+        else:
+            order["confirmation_status"] = "confirmed"
+            replaced_placeholder = _mark_placeholder_replaced(trip, "hotel_placeholder", order)
+            if replaced_placeholder:
+                fields = order.get("fields", {})
+                _append_merge_history(
+                    trip,
+                    "hotel_placeholder",
+                    "hotel_order",
+                    f"酒店订单替换住宿占位：{fields.get('hotel_name') or '酒店'}",
+                )
+    elif order_type == "train":
+        order["source_type"] = "train_order"
+        placeholder_type = _route_placeholder_type(trip, order)
+        if not placeholder_type:
+            order["confirmation_status"] = "date_conflict" if explicit_trip else "confirmed"
+            warning = "高铁订单路线与当前 Trip 的去程/返程方向不完全匹配，需要用户确认。"
+            needs_confirmation = True
+        else:
+            order["confirmation_status"] = "confirmed"
+            replaced_placeholder = _mark_placeholder_replaced(trip, placeholder_type, order)
+            if replaced_placeholder:
+                fields = order.get("fields", {})
+                _append_merge_history(
+                    trip,
+                    placeholder_type,
+                    "train_order",
+                    f"高铁订单替换{placeholder_type}：{fields.get('train_no') or '高铁'}",
+                )
+    else:
+        order.setdefault("source_type", "manual")
+        order.setdefault("confirmation_status", "confirmed")
+
+    _add_order_once(trip, order)
+    return {
+        "warning": warning,
+        "needs_confirmation": needs_confirmation,
+        "replaced_placeholder": replaced_placeholder,
+    }
+
+
+def _handle_flight_order(order: dict[str, Any], destination: str, dates: list[date], trip_id: str | None = None) -> dict[str, Any]:
     store = _read_store()
     trips = store.setdefault("trips", {})
-    matches = _matching_trips(trips, order, destination, dates)
+    matches = []
+    if trip_id:
+        target = trips.get(trip_id)
+        if not isinstance(target, dict):
+            return _result(False, data={"trip_id": trip_id}, error=f"Trip not found: {trip_id}")
+        matches = [target]
+    else:
+        matches = _matching_trips(trips, order, destination, dates)
     if not matches:
         return _result(
             True,
@@ -170,6 +347,7 @@ def _handle_flight_order(order: dict[str, Any], destination: str, dates: list[da
 
     target = matches[0]
     _ensure_trip_defaults(target)
+    warning = _trip_warning(target, order, destination, dates) if trip_id else None
     flights_result = flight_plan_reader.list_flights(days=30)
     if not flights_result.get("ok"):
         return flights_result
@@ -194,12 +372,14 @@ def _handle_flight_order(order: dict[str, Any], destination: str, dates: list[da
             "linked": match_result.get("linked", {}),
             "ambiguous_candidates": match_result.get("ambiguous_candidates", {}),
             "flight_link_status": target.get("flight_link_status"),
+            "warning": warning,
+            "needs_confirmation": bool(warning),
             "message": message,
         },
     )
 
 
-def add_order(text: str) -> dict[str, Any]:
+def add_order(text: str, trip_id: str | None = None) -> dict[str, Any]:
     parsed = travel_order_parser.parse_order_text(text)
     if parsed.get("order_type") == "unknown":
         return _result(False, data={"parsed": parsed}, error="unknown_travel_order")
@@ -212,17 +392,29 @@ def add_order(text: str) -> dict[str, Any]:
         "missing_fields": parsed.get("missing_fields", []),
         "confidence": parsed.get("confidence", 0.0),
         "added_at": util.now_local_iso(),
+        "source_type": f"{parsed['order_type']}_order" if parsed["order_type"] in {"hotel", "train", "flight"} else "manual",
+        "confirmation_status": "confirmed",
+        "replaced_placeholder_id": None,
     }
     destination = _order_destination(order)
     dates = _order_dates(order)
     if not dates:
         return _result(False, data={"parsed": parsed}, error="travel_order_missing_dates")
     if order["order_type"] == "flight":
-        return _handle_flight_order(order, destination, dates)
+        return _handle_flight_order(order, destination, dates, trip_id=trip_id)
 
     store = _read_store()
     trips = store.setdefault("trips", {})
-    target = _matching_trips(trips, order, destination, dates)[0] if _matching_trips(trips, order, destination, dates) else None
+    warning = None
+    explicit_trip = bool(trip_id)
+    if trip_id:
+        target = trips.get(trip_id)
+        if not isinstance(target, dict):
+            return _result(False, data={"trip_id": trip_id}, error=f"Trip not found: {trip_id}")
+        warning = _trip_warning(target, order, destination, dates)
+    else:
+        matches = _matching_trips(trips, order, destination, dates)
+        target = matches[0] if matches else None
 
     created_new = False
     if target is None:
@@ -237,6 +429,7 @@ def add_order(text: str) -> dict[str, Any]:
             "start_date": start_date,
             "end_date": max(dates).isoformat(),
             "orders": [],
+            "merge_history": [],
             "linked_flights": {},
             "needs_flight": True,
             "flight_link_status": "flight_pending_sync",
@@ -252,8 +445,8 @@ def add_order(text: str) -> dict[str, Any]:
         created_new = True
 
     _ensure_trip_defaults(target)
-    if not any(existing.get("raw_text_hash") == order["raw_text_hash"] for existing in target.get("orders", []) if isinstance(existing, dict)):
-        target.setdefault("orders", []).append(order)
+    merge_result = _merge_real_order_into_trip(target, order, explicit_trip=explicit_trip)
+    warning = warning or merge_result.get("warning")
     if destination and not target.get("destination_city"):
         target["destination_city"] = destination
     if target.get("source") != "travel_intent":
@@ -266,7 +459,17 @@ def add_order(text: str) -> dict[str, Any]:
     _update_trip_bounds(target)
     trip_flight_matcher.update_planning_status(target)
     _write_store(store)
-    return _result(True, data={"trip": target, "added_order": order, "created_new_trip": created_new})
+    return _result(
+        True,
+        data={
+            "trip": target,
+            "added_order": order,
+            "created_new_trip": created_new,
+            "warning": warning,
+            "needs_confirmation": bool(warning) or bool(merge_result.get("needs_confirmation")),
+            "replaced_placeholder": merge_result.get("replaced_placeholder"),
+        },
+    )
 
 
 def list_trips() -> dict[str, Any]:
@@ -299,6 +502,7 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     add = subparsers.add_parser("add")
     add.add_argument("--text", required=True)
+    add.add_argument("--trip-id")
     show = subparsers.add_parser("show")
     show.add_argument("--trip-id", required=True)
     cancel = subparsers.add_parser("cancel")
@@ -310,7 +514,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "add":
-        result = add_order(args.text)
+        result = add_order(args.text, trip_id=args.trip_id)
     elif args.command == "list":
         result = list_trips()
     elif args.command == "show":

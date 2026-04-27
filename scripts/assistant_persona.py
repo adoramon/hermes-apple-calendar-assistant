@@ -338,13 +338,87 @@ def _trip_event_icon(event: dict[str, Any]) -> str:
 def _format_trip_event_line(event: dict[str, Any]) -> list[str]:
     icon = _trip_event_icon(event)
     title = clean_text(event.get("title"))
-    lines = [f"{icon} {format_time_range(event.get('start'), event.get('end'))}"]
+    status = clean_text(event.get("confirmation_status"))
+    prefix = ""
+    if status == "confirmed":
+        prefix = "✅ "
+    elif status == "linked_readonly":
+        prefix = "🔗 "
+    elif status == "date_conflict":
+        prefix = "⚠️ "
+    elif status == "planned" or str(event.get("event_type") or "").endswith("_placeholder"):
+        prefix = "⏳ "
+    lines = [f"{prefix}{icon} {format_time_range(event.get('start'), event.get('end'))}"]
     if title:
         lines.append(f"   {title}")
     location = clean_text(event.get("location"))
     if location:
         lines.append(f"   📍 {location}")
     return lines
+
+
+def _trip_conflict_lines(trip: dict[str, Any]) -> list[str]:
+    conflicts = [
+        order
+        for order in trip.get("orders", [])
+        if isinstance(order, dict) and order.get("confirmation_status") == "date_conflict"
+    ]
+    if not conflicts:
+        return []
+    lines = ["⚠️ 日期冲突待确认："]
+    for order in conflicts:
+        fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+        if order.get("order_type") == "hotel":
+            name = clean_text(fields.get("hotel_name")) or "酒店订单"
+            checkin = clean_text(fields.get("checkin_date"))
+            checkout = clean_text(fields.get("checkout_date"))
+            lines.append(f"- 酒店：{name}，入住 {checkin}，离店 {checkout}")
+        elif order.get("order_type") == "train":
+            train_no = clean_text(fields.get("train_no")) or "高铁订单"
+            route = f"{clean_text(fields.get('departure_station'))} → {clean_text(fields.get('arrival_station'))}"
+            lines.append(f"- 高铁：{train_no} {route}")
+        else:
+            lines.append(f"- {clean_text(order.get('order_type')) or '订单'}")
+    lines.append("这些真实订单暂未替换计划占位，等您确认后再合并，避免误覆盖。")
+    return lines
+
+
+def format_trip_placeholder_replaced(trip: dict[str, Any], order: dict[str, Any]) -> str:
+    """Format a successful real-order replacement notice."""
+    fields = order.get("fields") if isinstance(order.get("fields"), dict) else {}
+    if order.get("order_type") == "hotel":
+        return "\n".join(
+            [
+                "高先生，我已经把酒店订单替换进这次出行了 🏨",
+                "",
+                f"✅ 酒店：{clean_text(fields.get('hotel_name'))}",
+                f"🛏️ 入住：{clean_text(fields.get('checkin_date'))} {clean_text(fields.get('checkin_time'))}".strip(),
+                f"🚪 离店：{clean_text(fields.get('checkout_date'))} {clean_text(fields.get('checkout_time'))}".strip(),
+                "",
+                "原来的“住宿计划”已被替换，不会重复写入。",
+            ]
+        )
+    if order.get("order_type") == "train":
+        return "\n".join(
+            [
+                "高先生，我已经把高铁订单替换进这次出行了 🚄",
+                "",
+                f"✅ 车次：{clean_text(fields.get('train_no'))}",
+                f"📍 {clean_text(fields.get('departure_station'))} → {clean_text(fields.get('arrival_station'))}",
+                f"🕐 {format_time_range(fields.get('departure_datetime'), fields.get('arrival_datetime'))}",
+                "",
+                "对应的去程/返程计划占位已被替换，不会重复写入。",
+            ]
+        )
+    return "高先生，我已经把真实订单合并进这次出行草稿了。"
+
+
+def format_trip_date_conflict(trip: dict[str, Any]) -> str:
+    """Format date conflict notice for real-order merge."""
+    lines = ["高先生，这张真实订单和当前 Trip 日期不太一致，我先不直接覆盖。", ""]
+    lines.extend(_trip_conflict_lines(trip))
+    lines.extend(["", "您确认这是同一次出行后，我再帮您合并。"])
+    return "\n".join(lines)
 
 
 def format_trip_draft(trip: dict[str, Any]) -> str:
@@ -487,6 +561,10 @@ def format_trip_with_readonly_flights(trip: dict[str, Any]) -> str:
     flight_lines = _linked_flight_sections(trip)
     if flight_lines:
         lines.extend(flight_lines)
+        lines.append("")
+    conflict_lines = _trip_conflict_lines(trip)
+    if conflict_lines:
+        lines.extend(conflict_lines)
         lines.append("")
 
     lines.append("待写入 Apple Calendar：")

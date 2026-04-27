@@ -319,6 +319,22 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/travel
 python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py add --text "<订单文字>"
 ```
 
+如果用户已指定某个 Trip，或多个候选 Trip 需要用户选择，使用：
+
+```bash
+python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_aggregator.py add \
+  --trip-id "<trip_id>" \
+  --text "<订单文字>"
+```
+
+真实酒店/高铁订单应优先替换已有计划 Trip placeholder，不要保留旧 placeholder 造成重复：
+
+- 酒店订单替换 `hotel_placeholder`。
+- 高铁去程替换 `outbound_placeholder`。
+- 高铁返程替换 `return_placeholder`。
+- 不替换 `meeting_placeholder`。
+- 日期冲突必须询问用户确认，不得直接覆盖。
+
 3. 如果 `order_type` 是 `flight`，只能作为匹配线索：
 
 - 解析航班信息
@@ -370,6 +386,8 @@ python3 /Users/administrator/Code/hermes-apple-calendar-assistant/scripts/trip_f
 11. 不读取微信 token，不请求外部网络，不保存截图原图。
 12. 截图识别由 Hermes / 多模态 / OCR 完成，本 Skill 只处理提取后的文字。
 13. Trip confirm 会按 fingerprint 去重；不得覆盖旧日程，不得删除旧日程。
+14. 真实订单替换计划占位后，写入 Calendar 前仍必须展示 Trip 草稿并等待用户确认。
+15. 存在 `date_conflict` 时不得调用 confirm 继续写入；必须先让用户确认它属于同一次出行。
 
 ### WeChat Trip Validation
 

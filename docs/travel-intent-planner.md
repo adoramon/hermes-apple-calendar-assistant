@@ -162,6 +162,9 @@ Hermes 预期行为：
 - 一句话出差模式先写计划草稿，不代表真实订单。
 - 用户后续发送机票、酒店、高铁订单截图时，应转交 `travel_order_parser.py` +
   `trip_aggregator.py` + `trip_flow.py` 处理真实订单聚合。
+- 真实酒店/高铁订单优先替换计划草稿中的 placeholder；必要时使用
+  `trip_aggregator.py add --trip-id <id>` 显式合并到指定 Trip。
+- 酒店日期与 Trip 日期不一致时标记 `date_conflict`，等待用户确认后再处理。
 - 航班以 Apple Calendar `飞行计划` 为准，机票截图只作为匹配线索。
 - 匹配成功后写入 `linked_flights`，并作为只读航班展示。
 - confirm 时不创建航班日程，只写客户拜访、酒店、高铁等非航班事件。

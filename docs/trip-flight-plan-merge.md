@@ -1,6 +1,6 @@
 # 计划 Trip 与飞行计划自动合并
 
-Status: Phase 49.
+Status: Phase 50.
 
 本阶段把一句话计划 Trip、酒店/高铁订单和 Apple Calendar 的「飞行计划」只读航班
 合并在一起。航班仍由航旅纵横统一管理，本项目只读取和关联，不创建航班日程。
@@ -36,6 +36,25 @@ python3 scripts/flight_plan_reader.py list --days 30
 - `source`
 
 本命令不写 Calendar、不创建事件、不修改「飞行计划」。
+
+诊断读取链路：
+
+```bash
+python3 scripts/flight_plan_reader.py diagnose --days 30
+```
+
+诊断输出区分：
+
+- `calendar_found`
+- `permission_ok`
+- `apple_script_ok`
+- `event_count`
+- `parse_success_count`
+- `parse_failed_count`
+- `errors`
+
+如果 AppleScript 查询失败，`diagnose` 会把错误放入 `errors` 和顶层 `error`，不会静默
+吞掉；`list` 仍可在运行环境受限时 fallback 到 `data/flight_seen.json` 做只读辅助。
 
 ## 匹配 Trip
 
@@ -100,6 +119,23 @@ python3 scripts/trip_flight_matcher.py match --trip-id <trip_id> --days 30
 ```
 
 机票截图不得产生待创建航班事件。
+
+## 与真实订单替换的关系
+
+Phase 50 起，酒店和高铁真实订单会优先替换一句话计划 Trip 中的 placeholder：
+
+- 酒店订单替换 `hotel_placeholder`。
+- 高铁去程替换 `outbound_placeholder`。
+- 高铁返程替换 `return_placeholder`。
+- 机票订单仍只用于匹配 `飞行计划`，不替换为待创建事件。
+
+如需指定候选 Trip：
+
+```bash
+python3 scripts/trip_aggregator.py add --trip-id <trip_id> --text "<订单文字>"
+```
+
+详见 `docs/trip-plan-order-merge.md`。
 
 ## Draft 展示
 

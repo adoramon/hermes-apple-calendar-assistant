@@ -90,6 +90,9 @@ def _train_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
             ]
         ),
         "confirmation_number": fields.get("confirmation_number", ""),
+        "source_type": order.get("source_type", "train_order"),
+        "confirmation_status": order.get("confirmation_status", "confirmed"),
+        "replaced_placeholder_id": order.get("replaced_placeholder_id"),
     }
 
 
@@ -111,6 +114,9 @@ def _placeholder_event(event: dict[str, Any], calendar: str | None) -> dict[str,
         "location": event.get("location", ""),
         "notes": event.get("notes", ""),
         "confirmation_number": "",
+        "source_type": event.get("source_type", "travel_intent"),
+        "confirmation_status": event.get("confirmation_status", "planned"),
+        "replaced_placeholder_id": event.get("replaced_placeholder_id"),
     }
 
 
@@ -149,6 +155,9 @@ def _hotel_event(order: dict[str, Any], calendar: str | None) -> dict[str, Any]:
             ]
         ),
         "confirmation_number": fields.get("confirmation_number", ""),
+        "source_type": order.get("source_type", "hotel_order"),
+        "confirmation_status": order.get("confirmation_status", "confirmed"),
+        "replaced_placeholder_id": order.get("replaced_placeholder_id"),
     }
 
 
@@ -157,13 +166,20 @@ def build_events(trip: dict[str, Any]) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     builders = {"train": _train_event, "hotel": _hotel_event}
     skipped_placeholders = {"outbound_placeholder", "return_placeholder"}
-    has_hotel_order = any(isinstance(order, dict) and order.get("order_type") == "hotel" for order in trip.get("orders", []))
+    has_confirmed_hotel_order = any(
+        isinstance(order, dict)
+        and order.get("order_type") == "hotel"
+        and order.get("confirmation_status") != "date_conflict"
+        for order in trip.get("orders", [])
+    )
     for event in trip.get("events", []):
         if not isinstance(event, dict):
             continue
         if event.get("event_type") in skipped_placeholders:
             continue
-        if event.get("event_type") == "hotel_placeholder" and has_hotel_order:
+        if event.get("confirmation_status") == "confirmed" and event.get("replaced_by_order_hash"):
+            continue
+        if event.get("event_type") == "hotel_placeholder" and has_confirmed_hotel_order:
             continue
         if str(event.get("event_type") or "").endswith("_placeholder"):
             item = _placeholder_event(event, calendar)
@@ -171,6 +187,8 @@ def build_events(trip: dict[str, Any]) -> list[dict[str, Any]]:
                 events.append(item)
     for order in trip.get("orders", []):
         if not isinstance(order, dict):
+            continue
+        if order.get("confirmation_status") == "date_conflict":
             continue
         builder = builders.get(str(order.get("order_type")))
         if builder:
@@ -248,6 +266,20 @@ def confirm_trip(trip_id: str) -> dict[str, Any]:
         return _result(False, error=f"Trip is not draft: {trip_id}")
     if trip.get("calendar") not in ALLOWED_TRIP_CALENDARS:
         return _result(False, data={"missing_fields": ["calendar"]}, error="trip_missing_calendar")
+    date_conflicts = [
+        order
+        for order in trip.get("orders", [])
+        if isinstance(order, dict) and order.get("confirmation_status") == "date_conflict"
+    ]
+    if date_conflicts:
+        return _result(
+            False,
+            data={
+                "date_conflicts": date_conflicts,
+                "display_message": assistant_persona.format_trip_date_conflict(trip),
+            },
+            error="trip_has_date_conflicts",
+        )
     events = build_events(trip)
     if not events:
         return _result(False, data={"missing_fields": ["events"]}, error="trip_has_no_events")

@@ -435,6 +435,31 @@ Apple Calendar
   不创建航班日程、不写 `飞行计划`、不修改 `飞行计划`、不删除 `飞行计划`、
   不重复写航班、不读微信 token、不请求外部网络、不自动订票、不跳过确认。
 
+### Phase 50 Real Order Replaces Trip Placeholders
+
+- `trip_aggregator.py` 增强：
+  `add` 支持 `--trip-id <id>`，可将真实订单显式合并到指定 Trip；`trip_id` 不存在时
+  返回 `ok=false`，明显不匹配时返回 `warning` 和 `needs_confirmation=true`。
+- placeholder 替换：
+  酒店订单替换 `hotel_placeholder`；高铁订单按路线替换 `outbound_placeholder` 或
+  `return_placeholder`；不替换 `meeting_placeholder`。
+- 日期冲突：
+  酒店订单日期与 Trip 日期不一致时标记 `confirmation_status=date_conflict`，暂不覆盖
+  住宿占位，等待用户确认。
+- Trip 字段：
+  placeholder / 真实订单增加 `source_type`、`confirmation_status`、
+  `replaced_placeholder_id`，Trip 增加 `merge_history`。
+- `trip_flow.py` 调整：
+  draft 展示 ✅ 已确认订单、⏳ 计划占位、🔗 飞行计划只读关联、⚠️ 日期冲突待确认；
+  存在 `date_conflict` 时阻止 confirm，避免误写入。
+- `flight_plan_reader.py` 增加：
+  `diagnose --days 30`，输出 `calendar_found`、`permission_ok`、`apple_script_ok`、
+  `event_count`、`parse_success_count`、`parse_failed_count`、`errors`。
+- 新增文档：`docs/trip-plan-order-merge.md`。
+- 安全边界：
+  不写 `飞行计划`、不创建航班事件、不删除旧日程、不覆盖真实确认事件、不跳过确认、
+  不请求外部网络、不写 Apple Reminders。
+
 ### Phase 42 Dedicated Assistant Persona System
 
 - 新增 `scripts/assistant_persona.py`，提供正式统一文案函数：
