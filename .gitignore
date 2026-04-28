@@ -4,4 +4,8 @@ __pycache__/
 .vscode/
 .env
 data/*.bak
+data/*.bak-*
+data/*.json
+data/*.jsonl
+!data/.gitkeep
 logs/
