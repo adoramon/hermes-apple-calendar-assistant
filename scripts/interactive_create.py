@@ -326,8 +326,21 @@ def _create_draft_from_args(args: argparse.Namespace) -> dict[str, Any]:
             draft_data["draft"]["end"],
         )
         if not conflict_result["ok"]:
-            return conflict_result
-        conflict_check = conflict_result["data"]
+            # Conflict checks are read-only and can fail because Calendar.app/osascript is
+            # temporarily unavailable. Keep the confirmation draft so the assistant can
+            # report the check failure honestly instead of pretending the event was written.
+            conflict_check = {
+                "calendar": draft_data["draft"]["calendar"],
+                "start": draft_data["draft"]["start"],
+                "end": draft_data["draft"]["end"],
+                "has_conflict": False,
+                "conflicts": [],
+                "suggested_slots": [],
+                "check_failed": True,
+                "error": conflict_result.get("error") or "Conflict check failed.",
+            }
+        else:
+            conflict_check = conflict_result["data"]
 
     save_result = save_pending_confirmation(
         args.session_key,
@@ -350,7 +363,13 @@ def _create_draft_from_args(args: argparse.Namespace) -> dict[str, Any]:
         data["has_conflict"] = conflict_check["has_conflict"]
         data["conflicts"] = conflict_check["conflicts"]
         data["suggested_slots"] = conflict_check["suggested_slots"]
-        if conflict_check["has_conflict"]:
+        if conflict_check.get("check_failed"):
+            data["conflict_check_failed"] = True
+            data["display_message"] = (
+                f"{save_result['data']['pending']['summary']}\n\n"
+                "提示：这次暂时没有完成日历冲突检查，请您确认后我再写入 Apple Calendar。"
+            )
+        elif conflict_check["has_conflict"]:
             data["display_message"] = assistant_persona.format_calendar_conflict(
                 conflict_check["conflicts"],
                 conflict_check["suggested_slots"],

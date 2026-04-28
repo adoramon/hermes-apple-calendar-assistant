@@ -79,15 +79,15 @@ python3 scripts/trip_flow.py draft --trip-id "<trip_id>"
 
 ## voice_mode
 
-- `off`：仅文字回复，不附带 TTS。
-- `smart`：默认模式，收到语音才语音回复；文字请求只回文字。
-- `always`：任何秘书类回复都可附带语音，适合开车模式。
+- `off`：仅文字回复，不附带 TTS；当前封板默认模式。
+- `smart`：仅当用户明确要求“语音回复”“读给我听”“用语音说”时附带 TTS 音频附件。
+- `always`：当前微信 iLink 通道不建议启用，避免无意义音频附件。
 
 切换测试：
 
 - `关闭语音回复`：应切换或建议切换到 `voice_mode=off`。
 - `打开语音回复`：应切换或建议切换到 `voice_mode=smart`。
-- `开车模式`：应切换或建议切换到 `voice_mode=always`。
+- `开车模式`：应按文字回复处理，不追加语音附件。
 
 ## 预期日志关键字
 
@@ -147,9 +147,10 @@ python3 scripts/trip_flow.py draft --trip-id "<trip_id>"
 
 - 检查 `voice_mode`：
   `off` 模式不会发语音。
+- 检查用户是否明确要求语音回复；没有明确要求时只回文字是预期行为。
 - 检查 Hermes profile 的 TTS 配置。
 - 检查 `gateway.log` 中是否出现 `TTS` 相关日志。
-- 本仓库不直接发送语音，只记录 voice_mode 行为约定。
+- 当前 Weixin iLink bot 出站原生 voice 气泡会被客户端静默丢弃；封板策略是音频附件。
 
 ### D. 修改或删除直接执行
 

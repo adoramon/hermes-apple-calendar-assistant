@@ -1,10 +1,10 @@
 # Apple Calendar Assistant
 
-Current version: `v2.0-rc local dispatch dry-run`
+Current version: `v2.0-rc wechat voice attachment sealed`
 
 ## v2.0.0-beta
 
-当前状态：`v2.0-rc local dispatch dry-run`
+当前状态：`v2.0-rc wechat voice attachment sealed`
 
 变更记录：
 
@@ -141,6 +141,11 @@ Current version: `v2.0-rc local dispatch dry-run`
   新增 `docs/wechat-voice-validation.md`，固化语音测试流程、`voice` / `ASR` /
   `TTS` / `schedule_query_router.py` / `reminder_action_flow.py` / `trip_flow.py`
   日志关键字、`voice_mode` 验收、失败排查和安全边界
+- WeChat voice attachment sealed：
+  当前 Weixin iLink bot 出站原生 voice 气泡会被客户端静默丢弃，因此封板为
+  “默认文字回复；用户明确要求语音时发送可见音频附件”。附件不带
+  `voice message as attachment` 英文提示，文件名使用中文；`开车模式` /
+  `安静模式` / `只文字回复` 不追加语音附件
 - 删除日程误报修复：
   新增 `delete_event_flow.py` 和 `docs/delete-event-flow.md`，删除请求先查询候选并生成
   二次确认草稿，确认后按 `calendar + title + start + end` 精确身份删除，避免

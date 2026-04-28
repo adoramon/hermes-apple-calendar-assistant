@@ -45,11 +45,24 @@ TIME_RE = re.compile(
     r"(?P<hour>\d{1,2}|[零〇一二两三四五六七八九十]{1,3})"
     r"(?:(?:点(?P<minute_word>\d{1,2}|[零〇一二两三四五六七八九十]{1,3}|半)?)|(?:[:：](?P<minute_colon>\d{1,2})))"
 )
+ABS_DATE_RE = re.compile(r"(?P<year>20\d{2})年(?P<month>\d{1,2})月(?P<day>\d{1,2})日?")
+ISO_DATE_RE = re.compile(r"(?P<year>20\d{2})[-/.](?P<month>\d{1,2})[-/.](?P<day>\d{1,2})")
+MONTH_DAY_RE = re.compile(r"(?<!\d)(?P<month>\d{1,2})月(?P<day>\d{1,2})日")
+TIME_RANGE_RE = re.compile(
+    r"(?P<start_daypart>上午|下午|晚上|今晚|中午|早上)?\s*"
+    r"(?P<start_hour>\d{1,2}|[零〇一二两三四五六七八九十]{1,3})"
+    r"(?:(?:点(?P<start_minute_word>\d{1,2}|[零〇一二两三四五六七八九十]{1,3}|半)?)|(?:[:：](?P<start_minute_colon>\d{1,2})))"
+    r"\s*(?:-|－|—|–|到|至|~|～)\s*"
+    r"(?P<end_daypart>上午|下午|晚上|今晚|中午|早上)?\s*"
+    r"(?P<end_hour>\d{1,2}|[零〇一二两三四五六七八九十]{1,3})"
+    r"(?:(?:点(?P<end_minute_word>\d{1,2}|[零〇一二两三四五六七八九十]{1,3}|半)?)|(?:[:：](?P<end_minute_colon>\d{1,2})))"
+)
 LOCATION_PATTERNS = (
+    re.compile(r"(?:于|在)(?P<location>[\u4e00-\u9fa5A-Za-z0-9_\-·\.（）()层楼号室厅教室大厦中心]+?)(?=，|,|。|；|;|为|举办|组织)"),
     re.compile(r"去(?P<location>[\u4e00-\u9fa5A-Za-z0-9_\-·\.]+?)(?=见|拜访|开会|吃饭|合作|$)"),
     re.compile(r"在(?P<location>[\u4e00-\u9fa5A-Za-z0-9_\-·\.]+?)(?=和|跟|与|见|拜访|开会|会议|吃饭|合作|$)"),
 )
-BUSINESS_KEYWORDS = ("客户", "会议", "商务", "开会", "拜访", "合作")
+BUSINESS_KEYWORDS = ("客户", "会议", "商务", "开会", "拜访", "合作", "公司", "管理层", "培训", "参会", "出席")
 PERSONAL_KEYWORDS = ("个人", "健身", "体检", "看病", "开药", "理发")
 COUPLE_KEYWORDS = ("家人", "入住酒店", "孩子", "吃饭", "家庭", "旅游", "夫妻", "太太", "老婆", "两个人")
 
@@ -74,6 +87,32 @@ def _parse_date(text: str, today: date) -> tuple[date | None, list[str], list[st
     """Parse supported date expressions from text."""
     assumptions: list[str] = []
     consumed: list[str] = []
+    for pattern in (ABS_DATE_RE, ISO_DATE_RE):
+        match = pattern.search(text)
+        if match:
+            try:
+                parsed = date(
+                    int(match.group("year")),
+                    int(match.group("month")),
+                    int(match.group("day")),
+                )
+            except ValueError:
+                return None, [], ["date_parse_failed"]
+            if re.search(r"(?:本周|下周|周|星期)[一二三四五六日天]", text):
+                assumptions.append("absolute_date_preferred_over_relative_weekday")
+            return parsed, [match.group(0)], assumptions
+
+    month_day = MONTH_DAY_RE.search(text)
+    if month_day:
+        try:
+            parsed = date(today.year, int(month_day.group("month")), int(month_day.group("day")))
+        except ValueError:
+            return None, [], ["date_parse_failed"]
+        if parsed < today:
+            parsed = date(today.year + 1, parsed.month, parsed.day)
+            assumptions.append("month_day_without_year_uses_next_year")
+        return parsed, [month_day.group(0)], assumptions
+
     if "后天" in text:
         return today + timedelta(days=2), ["后天"], assumptions
     if "明天" in text:
@@ -156,6 +195,67 @@ def _parse_time(text: str, event_date: date) -> tuple[datetime | None, list[str]
     return None, [], assumptions
 
 
+def _parse_time_value(
+    hour_text: str | None,
+    minute_word: str | None,
+    minute_colon: str | None,
+    daypart: str | None,
+) -> tuple[time | None, str | None]:
+    """Parse one time token from the richer time-range regex."""
+    if not hour_text:
+        return None, "time_parse_failed"
+    hour_value = _chinese_number_to_int(hour_text)
+    if hour_value is None or not 0 <= hour_value <= 23:
+        return None, "time_parse_failed"
+    if minute_word == "半":
+        minute = 30
+    elif minute_word:
+        minute_value = _chinese_number_to_int(minute_word)
+        if minute_value is None or not 0 <= minute_value <= 59:
+            return None, "time_parse_failed"
+        minute = minute_value
+    elif minute_colon:
+        minute_value = _chinese_number_to_int(minute_colon)
+        if minute_value is None or not 0 <= minute_value <= 59:
+            return None, "time_parse_failed"
+        minute = minute_value
+    else:
+        minute = 0
+    return time(_apply_daypart(daypart, hour_value), minute), None
+
+
+def _parse_time_range(text: str, event_date: date) -> tuple[datetime | None, datetime | None, list[str], list[str]]:
+    """Parse explicit time ranges such as 14:00-17:00 or 下午2点到5点."""
+    match = TIME_RANGE_RE.search(text)
+    if not match:
+        return None, None, [], []
+
+    start_time, start_error = _parse_time_value(
+        match.group("start_hour"),
+        match.group("start_minute_word"),
+        match.group("start_minute_colon"),
+        match.group("start_daypart"),
+    )
+    end_daypart = match.group("end_daypart") or match.group("start_daypart")
+    end_time, end_error = _parse_time_value(
+        match.group("end_hour"),
+        match.group("end_minute_word"),
+        match.group("end_minute_colon"),
+        end_daypart,
+    )
+    if start_error or end_error or start_time is None or end_time is None:
+        return None, None, [], ["time_parse_failed"]
+
+    start = datetime.combine(event_date, start_time)
+    end = datetime.combine(event_date, end_time)
+    if end <= start:
+        if start_time.hour >= 12 and end_time.hour < 12:
+            end = end.replace(hour=end.hour + 12)
+        if end <= start:
+            return start, None, [match.group(0)], ["time_range_end_not_after_start"]
+    return start, end, [match.group(0)], []
+
+
 def _infer_calendar(text: str) -> tuple[str, list[str]]:
     """Infer the target normal-write calendar from keywords."""
     if any(keyword in text for keyword in BUSINESS_KEYWORDS) or re.search(r"[\u4e00-\u9fa5A-Za-z]+总", text):
@@ -178,6 +278,18 @@ def _extract_location(text: str) -> tuple[str, list[str], list[str]]:
 
 def _extract_title(text: str, consumed: list[str], location: str) -> str:
     """Remove date/time/location scaffolding to produce a draft title."""
+    title_patterns = (
+        r"组织(?P<title>[^，。,。；;\n]{2,60}?(?:培训|会议|大会|会|活动))",
+        r"(?:参加|出席|举办)(?P<title>[^，。,。；;\n]{2,50}?(?:培训|会议|大会|会|活动))",
+        r"(?P<title>AI[^，。,。；;\n]{2,40}?(?:培训|会议|大会|会|活动))",
+    )
+    for pattern in title_patterns:
+        title_match = re.search(pattern, text)
+        if title_match:
+            title = title_match.group("title")
+            title = re.sub(r"^(?:高价值\s*|公司管理层)", "", title)
+            return title.strip(" ，,。")
+
     title = text
     for fragment in consumed:
         if fragment:
@@ -203,6 +315,11 @@ def parse_event_text(text: str, today: date | None = None) -> dict[str, Any]:
         return util.json_error("Could not parse event date.")
 
     start, time_consumed, time_assumptions = _parse_time(text, event_date)
+    range_start, range_end, range_consumed, range_assumptions = _parse_time_range(text, event_date)
+    if range_start is not None:
+        start = range_start
+        time_consumed = range_consumed
+        time_assumptions = range_assumptions
     assumptions.extend(time_assumptions)
     location, location_consumed, location_assumptions = _extract_location(text)
     assumptions.extend(location_assumptions)
@@ -212,9 +329,13 @@ def parse_event_text(text: str, today: date | None = None) -> dict[str, Any]:
     if start is None:
         return util.json_error("Could not parse event time.")
 
-    duration_minutes = settings.get_default_event_duration_minutes()
-    end = start + timedelta(minutes=duration_minutes)
-    assumptions.append(f"default_duration_minutes={duration_minutes}")
+    if range_end is not None:
+        end = range_end
+        assumptions.append("duration_from_explicit_time_range")
+    else:
+        duration_minutes = settings.get_default_event_duration_minutes()
+        end = start + timedelta(minutes=duration_minutes)
+        assumptions.append(f"default_duration_minutes={duration_minutes}")
 
     title = _extract_title(text, date_consumed + time_consumed + location_consumed, location)
     if not title:

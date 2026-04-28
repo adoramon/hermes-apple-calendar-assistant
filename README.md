@@ -266,13 +266,18 @@ Calendar and Trip readers, then returns a secretary-style summary. This path is
 read-only and never creates, updates, or deletes Calendar events. See
 [docs/wechat-schedule-query.md](docs/wechat-schedule-query.md).
 
-Phase 55 WeChat voice secretary mode: voice messages should reuse the Hermes
+Phase 55/56 WeChat voice secretary mode: voice messages should reuse the Hermes
 gateway ASR/TTS pipeline. After Hermes transcribes speech to text, secretary
 requests such as `我明天什么安排`, `帮我把下午会议推迟半小时`, or `下周上海出差怎么样`
-must route into the existing Calendar / Trip / reminder scripts. The default
-`voice_mode=smart` means voice requests may receive both text and TTS replies;
-`off` is text-only, and `always` is suitable for driving mode. Voice input does
-not bypass confirmation for create/update/delete. See
+must route into the existing Calendar / Trip / reminder scripts. Current sealed
+behavior is text-first: `voice_mode=off` is the default for the Weixin profile,
+and audio attachments are only expected when the user explicitly asks for a
+voice reply. `开车模式` / `安静模式` / `只文字回复` should not append audio
+attachments. Weixin iLink bot outbound native voice bubbles are known to be
+silently dropped by the client, so this version uses visible audio attachments
+when voice is explicitly requested; attachments use a Chinese file name such as
+`Hermes语音回复.ogg` and no `voice message as attachment` caption. Voice input
+does not bypass confirmation for create/update/delete. See
 [docs/wechat-voice-secretary.md](docs/wechat-voice-secretary.md).
 
 Phase 56 WeChat voice validation: the standard voice tests are `我明天什么安排`,

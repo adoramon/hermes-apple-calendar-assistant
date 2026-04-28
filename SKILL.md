@@ -107,12 +107,14 @@ token、不直连微信、不实现新的语音转写或发送逻辑，只处理
 voice_mode 由 Hermes profile/gateway 层管理，本仓库只记录行为约定：
 
 - `off`：仅文字回复。
-- `smart`：默认模式，收到语音请求时可附带女声 TTS，文字请求只回文字。
-- `always`：秘书类回复都可附带女声 TTS。
+- `smart`：仅在用户明确要求语音回复时可附带女声 TTS 音频附件。
+- `always`：当前微信 iLink 通道不建议使用，避免无意义音频附件。
 
-用户说“以后只文字回复”或“安静模式”时，应切换/建议切换 `voice_mode=off`。
-用户说“打开语音回复”时，应切换/建议切换 `voice_mode=smart`。
-用户说“开车模式”时，应切换/建议切换 `voice_mode=always`，但危险操作仍要确认。
+默认只回文字。用户没有明确说“语音回复”“读给我听”“用语音说”时，不要追加语音附件。
+用户说“以后只文字回复”“安静模式”“开车模式”“我在开车”时，应按文字回复处理，
+不要追加语音附件。当前 Weixin iLink bot 出站原生 voice 气泡会被客户端静默丢弃，
+因此如确需语音，使用 Hermes 生成的可见音频附件；附件不得带
+`voice message as attachment` 这类英文提示。
 
 语音回复文案应简短、口语化、专业亲近。可使用：
 
@@ -127,7 +129,7 @@ voice_mode 由 Hermes profile/gateway 层管理，本仓库只记录行为约定
 1. 用户语音：`我明天什么安排`
    - Hermes 应完成 ASR 转文字。
    - 应调用 `schedule_query_router.py query --text "我明天什么安排"`。
-   - 返回文字回复，并按 `voice_mode` 决定是否附带 TTS。
+   - 默认返回文字回复；只有用户明确要求语音回复时才附带 TTS 音频附件。
 2. 用户语音：`帮我把下午会议推迟半小时`
    - 应进入 `reminder_action_flow.py draft` 或日程修改草稿流程。
    - 只生成草稿，不直接修改 Calendar。

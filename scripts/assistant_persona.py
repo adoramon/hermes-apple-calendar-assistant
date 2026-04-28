@@ -1127,3 +1127,72 @@ def format_travel_plan_confirmed(plan: dict[str, Any], results: list[dict[str, A
         ]
     )
     return "\n".join(lines)
+
+
+def format_voice_schedule_reply(summary: dict[str, Any] | str) -> str:
+    """Format a short spoken-style schedule reply for WeChat voice mode."""
+    if isinstance(summary, str):
+        text = clean_text(summary)
+        return text or "高先生，我这边暂时没看到明确安排。"
+
+    title = clean_text(summary.get("title") or summary.get("query_type"))
+    first_item = clean_text(summary.get("first_item") or summary.get("first_event"))
+    suggestion = clean_text(summary.get("suggestion"))
+    if not first_item:
+        items = summary.get("items") or []
+        if items and isinstance(items[0], dict):
+            item = items[0]
+            first_item = clean_text(item.get("title"))
+            when = clean_text(item.get("time") or item.get("start"))
+            if when and first_item:
+                first_item = f"{when} {first_item}"
+    lines = ["高先生，我帮您看过了。"]
+    if title and title not in {"today_schedule", "tomorrow_schedule"}:
+        lines.append(title)
+    if first_item:
+        lines.append(f"第一项是 {first_item}。")
+    else:
+        lines.append("目前没有看到特别紧的安排。")
+    if suggestion:
+        lines.append(suggestion)
+    return "\n".join(lines)
+
+
+def format_voice_trip_reply(trip: dict[str, Any] | str) -> str:
+    """Format a short spoken-style Trip reply for WeChat voice mode."""
+    if isinstance(trip, str):
+        text = clean_text(trip)
+        return text or "高先生，这趟出行我暂时还没看到完整行程。"
+
+    destination = clean_text(trip.get("destination_city")) or "这趟出行"
+    start = _briefing_date(trip.get("start_date"))
+    end = _briefing_date(trip.get("end_date"))
+    status = clean_text(trip.get("planning_status"))
+    lines = [f"高先生，{destination}这趟我帮您看了一下。"]
+    if start:
+        lines.append(f"时间是 {start} 到 {end}。" if end else f"时间是 {start}。")
+    if status == "fully_confirmed":
+        lines.append("整体已经比较稳了，我会继续替您盯着临近提醒。")
+    elif status == "partially_confirmed":
+        lines.append("已有部分行程确认了，剩下的我建议等订单同步后再补齐。")
+    else:
+        lines.append("目前更像计划草稿，交通和酒店还需要后续订单确认。")
+    return "\n".join(lines)
+
+
+def format_voice_confirm_reply(action: dict[str, Any] | str) -> str:
+    """Format a concise spoken confirmation prompt for voice interactions."""
+    if isinstance(action, str):
+        text = clean_text(action)
+        return text or "高先生，我先生成草稿，您确认后我再执行。"
+
+    action_name = clean_text(action.get("action") or action.get("intent")) or "这个操作"
+    title = clean_text(action.get("title") or action.get("event_title"))
+    when = clean_text(action.get("time") or action.get("start"))
+    lines = ["高先生，我先给您整理成待确认草稿。"]
+    detail = title or action_name
+    if when:
+        detail = f"{detail}，时间 {when}"
+    lines.append(f"请您确认后，我再处理：{detail}。")
+    lines.append("删除、修改和写入日历都不会直接跳过确认。")
+    return "\n".join(lines)

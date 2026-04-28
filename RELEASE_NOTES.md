@@ -1,5 +1,22 @@
 # Release Notes
 
+## v2.0-rc WeChat Voice Attachment Sealed
+
+当前封板状态：微信语音输入可通过 Hermes ASR 进入 Calendar / Trip / reminder
+秘书链路；默认只回复文字。用户明确要求语音回复时，Hermes 使用可见音频附件承载
+TTS，不再默认尝试发送 Weixin 原生 voice 气泡。
+
+- 修复“今天有什么安排”查询窗口：今天查询使用“当前询问时间 -> 当天 24:00”，避免
+  已结束的昨晚行程误入今日安排。
+- 修复会议通知创建链路：长文本会议/培训通知优先进入解析与确认式创建草稿，不再只
+  回复“稍后写入”。
+- 语音回复默认关闭自动附件：未明确要求语音回复时只回文字。
+- `开车模式`、`安静模式`、`只文字回复` 均不追加语音附件。
+- Weixin iLink bot 出站原生 voice 气泡会被客户端静默丢弃；本版本保留 SILK 转码
+  能力，但默认使用可见音频附件作为可靠降级。
+- 音频附件不再发送 `voice message as attachment` 英文提示，附件文件名使用中文
+  `Hermes语音回复.<ext>`。
+
 ## v2.0-rc Local Dispatch Dry-run
 
 当前状态是 `v2.0-rc local dispatch dry-run`。本阶段新增 Hermes 本机 dispatch

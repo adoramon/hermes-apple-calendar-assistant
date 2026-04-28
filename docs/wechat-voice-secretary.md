@@ -25,19 +25,23 @@ Phase 55 目标是让微信语音消息进入现有秘书事务链路：Hermes g
 
 ## voice_mode
 
-- `off`：仅文字回复。
-- `smart`：默认模式，用户发语音时才附带语音回复；文字请求只回文字。
-- `always`：任何秘书类回复都附带语音，适合开车或不方便看屏幕时使用。
+- `off`：仅文字回复，当前封板默认模式。
+- `smart`：仅当用户明确要求“语音回复”“读给我听”“用语音说”时附带 TTS 音频附件。
+- `always`：当前 Weixin iLink 通道不建议启用，避免无意义音频附件。
 
 切换话术：
 
 - `以后只文字回复`：切换到 `off`。
 - `安静模式`：切换到 `off`。
-- `打开语音回复`：切换到 `smart`。
-- `开车模式`：切换到 `always`。
+- `打开语音回复`：可切换到 `smart`，但仍只在明确语音请求时发送音频附件。
+- `开车模式`：按文字回复处理，不追加语音附件。
 
 voice_mode 建议由 Hermes profile / gateway 层保存，本仓库不读取微信 token，也不直接
 调用微信发送接口。
+
+当前 Weixin iLink bot 出站原生 voice 气泡会被客户端静默丢弃：HTTP/iLink 返回成功，
+但微信端不显示语音气泡。封板策略是使用可见音频附件作为语音回复载体；附件不带
+`voice message as attachment` 英文提示，文件名应为中文，例如 `Hermes语音回复.ogg`。
 
 ## 示例语音指令
 
@@ -125,7 +129,8 @@ python3 scripts/trip_flow.py draft --trip-id "<trip_id>"
 
 - 语音被当闲聊：检查转写文本是否包含秘书事务关键词，检查 `SKILL.md` 是否加载了
   WeChat Voice Secretary Rules。
-- 没有语音回复：检查 profile 的 voice/TTS 设置和 `voice_mode`，本仓库不直接发送语音。
+- 没有语音回复：先确认用户是否明确要求语音回复；默认文字回复是预期行为。
+  如明确要求仍无音频附件，再检查 profile 的 voice/TTS 设置和 `voice_mode`。
 - 直接修改或删除日程：严重错误，应回到确认式 draft -> confirm 流程。
 - 查询没结果：先确认 ASR 转写是否准确，再看 `schedule_query_router.py query` 输出。
 - TTS 声音不对：在 Hermes gateway/profile 层调整 voice provider 或 voice id。
@@ -144,5 +149,5 @@ python3 scripts/trip_flow.py draft --trip-id "<trip_id>"
 安静模式
 ```
 
-系统应切换或建议切换为 `voice_mode=off`。如果当前 Hermes profile 尚未持久化
-voice_mode，本仓库文档只记录预期行为，不直接修改 profile 配置文件。
+系统应切换或建议切换为 `voice_mode=off`。当前封板默认即为文字优先；安静模式、
+开车模式、只文字回复都不应追加语音附件。

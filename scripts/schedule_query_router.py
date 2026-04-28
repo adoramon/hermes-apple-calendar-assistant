@@ -64,12 +64,17 @@ def _extract_city(text: str) -> str:
     return ""
 
 
-def _parse_window(text: str, today: date) -> tuple[str, datetime, datetime]:
+def _today_remaining_window(now: datetime) -> tuple[datetime, datetime]:
+    return now.replace(microsecond=0), datetime.combine(now.date() + timedelta(days=1), time.min)
+
+
+def _parse_window(text: str, now: datetime) -> tuple[str, datetime, datetime]:
+    today = now.date()
     if "明天" in text:
         start, end = _day_window(today + timedelta(days=1))
         return "tomorrow_schedule", start, end
     if "今天" in text or "今日" in text:
-        start, end = _day_window(today)
+        start, end = _today_remaining_window(now)
         return "today_schedule", start, end
     if "下周" in text:
         start, end = _week_window(today, next_week=True)
@@ -80,7 +85,7 @@ def _parse_window(text: str, today: date) -> tuple[str, datetime, datetime]:
     if "这个月" in text or "本月" in text:
         start, end = _month_window(today)
         return "month_schedule", start, end
-    start, end = _day_window(today)
+    start, end = _today_remaining_window(now)
     return "today_schedule", start, end
 
 
@@ -187,8 +192,8 @@ def _summary(query_type: str, text: str, events: list[dict[str, Any]], trips: li
 def query(text: str) -> dict[str, Any]:
     if not isinstance(text, str) or not text.strip():
         return _result(False, error="text must be a non-empty string")
-    today = datetime.now().date()
-    query_type, start, end = _parse_window(text, today)
+    now = datetime.now()
+    query_type, start, end = _parse_window(text, now)
     events, errors = _calendar_events(start, end, text)
     trips = _trip_items(start, end, text) if _is_trip_query(text) else []
     if _is_trip_query(text) and _extract_city(text):
