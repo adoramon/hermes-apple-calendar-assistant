@@ -1,362 +1,289 @@
-# hermes-apple-calendar-assistant
+# Hermes Apple Calendar Assistant
 
-Apple Calendar Assistant 是一个 macOS-only Hermes custom skill，用于在
-`sunny-wechat-lite` profile 中操作 Calendar.app。当前开发线是
-`v2.0-rc local dispatch dry-run`。
+Language: [中文](#中文) | [English](#english)
 
-## v2.0-rc Local Dispatch Dry-run
+## 中文
 
-v2.0-rc local dispatch dry-run 已支持：
+Hermes Apple Calendar Assistant 是一个面向 macOS Calendar.app 的 Hermes
+自定义 Skill。它把微信或其他 Hermes 输入转成安全的日程查询、草稿、确认式写入、
+提醒摘要和出行摘要。
 
-- 明确时间范围后查询 Apple Calendar 日程
-- 确认式创建、修改、删除日程
-- 自然语言日程草稿解析
-- 创建草稿时可选冲突检测：`--check-conflict`
-- 单日历冲突检测与建议时间段
-- 提醒候选扫描：只输出 JSON，不主动发送消息
-- reminder worker launchd 模板
-- outbox dry-run 队列与 dry-run consumer
-- outbox 真实发送前安全开关：`send_mode`、`allowed_channels`、
-  `max_messages_per_run`
-- 真实发送前 channel sender 抽象：当前仅支持 `dry_run` + `hermes`
-- Hermes 本机 dispatch dry-run 占位：`scripts/hermes_dispatcher.py`
-- Hermes 本地 outbox 读取接口：`pending`、`status`、`mark-dry-run-sent`
-- `飞行计划` location 自动增强 launchd 后台任务
+本仓库只保存代码、文档和配置模板。运行时数据位于 `data/`，已被 `.gitignore`
+忽略，避免把真实日程、地点、航班、消息内容或待确认草稿提交到 GitHub。
 
-v2.0-beta dry-run readiness excludes:
+### 当前状态
 
-- Birthday reminders
-- Contacts, lunar birthday, or anniversary workflows
-- Travel Time automation
-- Reminder/alarm enhancement or notification delivery
-- Native Swift helpers
-- Extra preparation events for flights
+- 版本线：`v2.0-rc wechat voice attachment sealed`
+- 平台：macOS only
+- Python：3.11+
+- Calendar 访问：AppleScript / `osascript`
+- Hermes profile：由本机运行环境配置，本 README 不记录个人 profile 名称或 token
 
-Acceptance summary: the dry-run reminder/outbox chain has been validated for
-local operation. It still does not send WeChat, Telegram, Hermes push, or any
-external network message.
+### 核心能力
 
-Real-send channel decision: prefer Hermes local callback / local CLI. Telegram
-Bot API and direct WeChat automation are not selected for now because they would
-introduce tokens, external network requests, or bypass Hermes scheduling and
-audit. See [docs/real-send-channel-options.md](docs/real-send-channel-options.md)
-and [docs/decision-records/ADR-001-real-send-channel.md](docs/decision-records/ADR-001-real-send-channel.md).
+- 查询 Apple Calendar 日程，必须有明确时间范围。
+- 通过自然语言生成日程草稿。
+- 创建、修改、删除日程都必须先展示确认摘要。
+- 删除日程需要二次确认，并按 `calendar + title + start + end` 精确删除。
+- 支持冲突检测和建议时间段。
+- 支持本地提醒扫描、outbox 队列和 Hermes Cron bridge 投递。
+- 支持酒店、交通、会议等出行订单文本聚合成 Trip 草稿。
+- 支持一句话出差/旅行计划草稿。
+- 支持 Trip 行前摘要提醒。
+- 支持微信语音输入经 Hermes ASR 转文字后进入日程/Trip/提醒路由。
 
-Phase 28 discovery update: the Hermes profile contains WeChat account/config
-artifacts and a Weixin DM channel identifier, but this repository still must not
-read or copy profile tokens, must not call `ilinkai.weixin.qq.com`, and must not
-implement real WeChat sending until Hermes exposes a confirmed safe local
-dispatch interface. See [docs/wechat-dispatch-discovery.md](docs/wechat-dispatch-discovery.md)
-and [docs/decision-records/ADR-002-wechat-dispatch-discovery.md](docs/decision-records/ADR-002-wechat-dispatch-discovery.md).
+### 安全边界
 
-Phase 29 technical research update: Hermes source contains
-`gateway.delivery.DeliveryRouter`, but real delivery depends on gateway runtime
-live adapters injected by `gateway/run.py`. Because this repository is an
-independent Skill script, it still must not try to call real send directly,
-must not replicate Weixin adapter initialization, and must not bypass Hermes
-gateway permission and audit boundaries. See
-[docs/hermes-delivery-router-research.md](docs/hermes-delivery-router-research.md)
-and [docs/decision-records/ADR-003-hermes-delivery-router.md](docs/decision-records/ADR-003-hermes-delivery-router.md).
+- 不读取微信 token。
+- 不直连微信 API。
+- 不请求外部网络查询航班、酒店或价格。
+- 不订票、不订酒店。
+- 不写 Apple Reminders。
+- 不跳过确认直接创建、修改或删除 Calendar 事件。
+- 不创建航班日程。
+- 受保护航班日历只读；唯一例外是专用航班位置增强脚本可更新原航班事件的
+  `location` 字段。
+- 运行时 `data/*.json` 和 `data/*.jsonl` 不进入 Git。
 
-Phase 30 validation update: local testing confirmed that Hermes Cron Delivery
-can reach WeChat through `Hermes Cron -> DeliveryRouter -> Weixin Adapter ->
-微信`. This repository still must not read `weixin` token or call `ilink` /
-Weixin APIs directly; the recommended future real-send architecture is Calendar
-Skill outbox generation plus Hermes Cron `--deliver` inside the Hermes runtime.
-See [docs/hermes-cron-delivery-test.md](docs/hermes-cron-delivery-test.md) and
-[docs/decision-records/ADR-004-hermes-cron-delivery.md](docs/decision-records/ADR-004-hermes-cron-delivery.md).
+### 日历配置
 
-Phase 31 bridge update: this repository now includes a read-only Hermes Cron
-Outbox Bridge script for `cron --script`, which renders oldest `pending` outbox
-records as plain text without changing outbox status. It is intended for
-validation and integration preparation only; until Phase 32 adds status marking,
-it must not be treated as a long-running real-send workflow. See
-[docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md).
+请在 `config/settings.json` 中配置本机日历名称。README 使用通用占位符：
 
-Phase 32 bridge update: the Hermes Cron Outbox Bridge now supports
-`--mark-sent`, which marks selected `pending` records as
-`sent_via_hermes_cron` after rendering them to stdout for Hermes Cron delivery.
-Real WeChat sending is still completed by Hermes Cron Delivery, not by this
-repository. The bridge still does not read Hermes tokens, does not call WeChat
-APIs directly, and does not modify message content. See
-[docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md).
+- `READ_CALENDARS`：允许查询的日历列表。
+- `WRITE_CALENDARS`：允许普通创建/修改/删除的日历列表。
+- `PROTECTED_FLIGHT_CALENDAR`：由外部航班工具同步的受保护航班日历。
 
-Phase 33 enablement update: the Hermes Cron Outbox Bridge path is now the
-active delivery path. `reminder_worker` launchd writes pending outbox messages,
-Hermes Cron job `calendar-outbox-wechat-bridge` reads them with
-profile script `~/.hermes/profiles/sunny-wechat-lite/scripts/calendar_outbox_bridge.py`,
-and Hermes Cron Delivery sends them through DeliveryRouter and the Weixin
-adapter. Different profiles should use their own `~/.hermes/profiles/<profile>/scripts/`
-directory rather than a global Hermes scripts directory. `outbox_consumer`
-dry-run launchd must remain paused so it does not consume pending messages
-before the Cron bridge can deliver them. `sent_via_hermes_cron` means the
-record was handed to Hermes Cron stdout for delivery and should not be sent
-again by the bridge, but it is not a guarantee that downstream delivery
-succeeded. See
-[docs/hermes-cron-outbox-bridge.md](docs/hermes-cron-outbox-bridge.md),
-[docs/hermes-profile-install.md](docs/hermes-profile-install.md), and
-[docs/v2-rc-local-dispatch-acceptance.md](docs/v2-rc-local-dispatch-acceptance.md).
+不要把真实个人日历名、客户名、地点或订单信息写进 README、issue、commit message
+或公开文档。
 
-Phase 34 wrapper correction: Hermes `cron --script` in this setup reads Python
-scripts from the profile-specific directory, so the wrapper must be
-`calendar_outbox_bridge.py`, not a `.sh` shell wrapper. The wrapper is local
-Hermes profile runtime configuration, not part of this repository, and different
-profiles should keep their own wrapper under
-`~/.hermes/profiles/<profile>/scripts/`.
-
-Phase 38 reminder action update: WeChat reminder follow-up replies can now be
-parsed into confirmation-required drafts. Replies such as `延后30分钟`, `取消这个日程`,
-`改到明天上午10点`, `已到达`, `不再提醒`, and `提前30分钟提醒我` are handled through
-`scripts/reminder_action_flow.py`. Drafting never modifies Calendar; cancel and
-reschedule actions only execute after explicit confirmation. See
-[docs/reminder-action-flow.md](docs/reminder-action-flow.md).
-
-Phase 39 reminder action test update: Hermes WeChat interaction testing now
-uses `延后30分钟`, `取消这个日程`, and `改到明天上午10点` as acceptance replies. The
-expected behavior is always draft first, then explicit confirmation for delete
-or reschedule. If a WeChat reply does not produce a draft, check
-`~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log`,
-`~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log`, and
-`python3 scripts/outbox.py list --limit 20`.
-
-Phase 40 reminder copy and behavior update: the Hermes Cron outbox bridge now
-renders WeChat reminders as natural Chinese assistant messages with light emoji,
-for example `📅 日程提醒` plus time, title, and location. Hermes must call
-`reminder_action_flow.py draft --text "<用户原文>"` first for replies like
-`推迟30分钟`, `取消这个日程`, or `改到明天上午10点` when a recent reminder exists, and
-must not ask which event unless the draft flow returns no context or multiple
-candidates. This project operates Apple Calendar, not Apple Reminders; responses
-must not say `已同步至 Apple Reminders`.
-
-Calendar event query bugfix update: reminder testing found that an event could
-exist in Calendar.app but be dropped by `calendar_ops.py events` when its
-location or notes contained line breaks, or when AppleScript date-property
-filters were parsed differently by Calendar.app. The query path now preserves
-tab-delimited empty fields, cleans multi-line fields, and uses the verified
-`whose its start date/end date` syntax. See
-[docs/calendar-event-query-bugfix.md](docs/calendar-event-query-bugfix.md).
-
-Phase 42 persona system update: user-facing Calendar replies now use the
-dedicated “高总的私人行政助理” persona. `scripts/assistant_persona.py` centralizes
-wording for create/update/delete success, reminder pushes, conflict notices,
-pending drafts, reminder follow-up actions, and friendly errors. CLI JSON keeps
-its core fields and exposes persona text through `data.display_message`. See
-[docs/persona-style.md](docs/persona-style.md) and
-[docs/persona-examples.md](docs/persona-examples.md).
-
-Phase 43 hotel order update: copied hotel order text, or OCR text extracted by
-Hermes from a screenshot, can now be parsed into a Calendar draft. The flow asks
-the user to choose `个人计划` or `夫妻计划`, requires a concrete check-in time, and
-only writes Apple Calendar after explicit confirmation. It does not write
-`飞行计划`, create reminders, operate Apple Reminders, request the network, or
-perform OCR itself. If a user sends a screenshot and Hermes extracts hotel-order
-text, the Skill should automatically enter the hotel draft flow without asking
-the user to label it as a hotel order. See
-[docs/hotel-order-flow.md](docs/hotel-order-flow.md) and
-[docs/hotel-order-image-detection.md](docs/hotel-order-image-detection.md).
-
-Phase 44 hotel screenshot WeChat acceptance update: the expected WeChat path is
-now documented as screenshot -> Hermes image text extraction ->
-`hotel_order_flow.py draft` -> missing-field follow-up for `个人计划` / `夫妻计划`
-and check-in time -> `hotel_order_flow.py update-draft` -> explicit user
-confirmation -> `hotel_order_flow.py confirm` -> Apple Calendar write. The
-expected logs should include `hotel_order_flow.py draft`,
-`hotel_order_flow.py update-draft`, and `hotel_order_flow.py confirm`. If Hermes
-only summarizes the screenshot, defaults to `个人计划`, asks whether to write the
-hotel into a flight note, or calls generic `interactive_create.py`, the routing
-is wrong and should be debugged through the profile logs. The flow still must
-not write `商务计划`, `家庭计划`, `飞行计划`, or Apple Reminders, and must not write
-Calendar before confirmation.
-
-Hermes profile governance: `sunny-wechat-lite` must not autonomously create,
-update, or replace calendar-related Skills from conversation summaries. Calendar,
-hotel order, reminder, and flight-plan conversations must route through this
-repository Skill and scripts. If an automatic skill-save prompt appears, the
-expected response is `Nothing to save.` unless 高先生 explicitly asks to create
-or update a Skill in the current conversation.
-
-Phase 45 Pro business travel secretary update: copied or OCR-extracted flight,
-hotel, and train order text can now be parsed by `travel_order_parser.py`,
-collected by `trip_aggregator.py`, and drafted by `trip_flow.py` as one
-combined Trip. The user must choose `商务计划`, `个人计划`, or `夫妻计划`; only
-`trip_flow.py confirm` writes Apple Calendar events, and duplicate fingerprints
-in `data/trip_seen.json` are skipped instead of overwritten. This flow does not
-write `飞行计划`, does not operate Apple Reminders, does not request the network,
-and does not save screenshot images. See [docs/trip-aggregator.md](docs/trip-aggregator.md)
-and [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
-
-Phase 46 WeChat Trip aggregation validation closure: the expected WeChat flow
-is now documented as continuous travel order screenshots -> Hermes OCR text
-extraction -> `travel_order_parser.py parse` -> `trip_aggregator.py add` ->
-`trip_flow.py draft` -> calendar follow-up (`商务计划` / `个人计划` / `夫妻计划`) ->
-`trip_flow.py set-calendar` -> explicit confirmation -> `trip_flow.py confirm`
--> one-time Apple Calendar write. The validation docs also record required log
-keywords, success criteria, failure triage, test phrases, and rollback /
-cleanup guidance for `trip_drafts.json` and `trip_seen.json`. This flow still
-must not write `飞行计划`, must not write Apple Reminders, and must not skip
-confirmation. See [docs/trip-wechat-validation.md](docs/trip-wechat-validation.md),
-[docs/trip-aggregator.md](docs/trip-aggregator.md), and
-[docs/business-travel-secretary.md](docs/business-travel-secretary.md).
-
-Phase 47 one-sentence travel planning mode: users can now express business or
-travel intent without sending order screenshots first, for example “下周去上海见客户，
-两天” or “和太太下月去东京玩五天”. The new local planning flow is
-`travel_intent_parser.py parse` -> `trip_planner.py draft` -> explicit user
-confirmation -> `trip_planner.py confirm`. It only creates local plan drafts,
-does not book tickets, does not query prices, does not request the network, and
-does not treat planned placeholders as real orders. Confirmed titles are written
-as plan placeholders such as `去程计划｜...` and notes state that traffic/hotel
-details still await real orders. If the user later sends order screenshots,
-Hermes should hand the same trip back to the Trip Aggregator flow for accurate
-replacement. See [docs/travel-intent-planner.md](docs/travel-intent-planner.md)
-and [docs/business-travel-secretary.md](docs/business-travel-secretary.md).
-
-Phase 48 WeChat validation closure for one-sentence travel planning: the
-expected WeChat flow is now documented as natural-language travel intent ->
-`travel_intent_parser.py parse` -> `trip_planner.py draft` -> plan draft display
-with clear “计划草稿 / 非实际订单” wording -> calendar choice
-(`商务计划` / `个人计划` / `夫妻计划`) -> `trip_planner.py set-field` when needed
--> explicit user confirmation -> `trip_planner.py confirm` -> Apple Calendar
-write. The validation docs record standard test phrases, log keywords, success
-criteria, failure triage, and cleanup guidance. The flow still must not request
-external flight/hotel data, must not write `飞行计划`, must not write Apple
-Reminders, and must not skip confirmation. See
-[docs/travel-intent-wechat-validation.md](docs/travel-intent-wechat-validation.md)
-and [docs/travel-intent-planner.md](docs/travel-intent-planner.md).
-
-Phase 49 flight-plan merge update: Trip planning now treats Apple Calendar
-`飞行计划` as the protected source of truth for flights. `flight_plan_reader.py`
-reads future `飞行计划` events, `trip_flight_matcher.py` links matching outbound
-and return flights into Trip drafts as read-only `linked_flights`, and
-`trip_flow.py` excludes those flights from events written to
-`商务计划` / `个人计划` / `夫妻计划`. Flight screenshots are only matching hints and
-must not create duplicate flight events. Hotels, trains, and customer visits
-remain confirmable writes to the selected normal calendar. See
-[docs/trip-flight-plan-merge.md](docs/trip-flight-plan-merge.md).
-
-Phase 50 real-order merge update: real hotel and train orders now replace
-travel-intent Trip placeholders instead of creating duplicate plan items.
-`trip_aggregator.py add --trip-id <id>` can merge an order into an explicitly
-selected Trip, hotel date mismatches are marked `date_conflict` for user
-confirmation, and `flight_plan_reader.py diagnose --days 30` exposes Calendar
-permission / AppleScript / parsing diagnostics. Flight orders still never create
-flight events; they only assist matching `飞行计划`. See
-[docs/trip-plan-order-merge.md](docs/trip-plan-order-merge.md).
-
-Phase 51 WeChat multi-Trip merge validation: when multiple Trip drafts may match
-one hotel/train order, Hermes must list candidate Trips, ask the user to choose,
-then call `trip_aggregator.py add --trip-id <id>` for the selected target. Hotel
-orders replace `hotel_placeholder`, train orders replace outbound/return
-placeholders, date conflicts require follow-up, and flight screenshots still
-only link to `飞行计划`. See
-[docs/trip-merge-wechat-validation.md](docs/trip-merge-wechat-validation.md).
-
-Phase 52 Trip briefing worker: `trip_briefing_worker.py scan --hours 48`
-generates pre-trip briefing messages for draft/confirmed Trips that start soon.
-It summarizes destination, outbound transport, hotel, meetings, return transport,
-pending items, and departure suggestions, then writes a `trip_briefing` message
-to `data/outbox_messages.jsonl` for Hermes Cron delivery. It does not modify
-Calendar or send WeChat directly. See
-[docs/trip-briefing-worker.md](docs/trip-briefing-worker.md).
-
-Phase 54 WeChat schedule query mode: users can ask natural-language questions
-like `我明天什么安排`, `今天还有几个会`, or `下周上海出差怎么样`.
-`schedule_query_router.py query --text "<user text>"` routes the request to
-Calendar and Trip readers, then returns a secretary-style summary. This path is
-read-only and never creates, updates, or deletes Calendar events. See
-[docs/wechat-schedule-query.md](docs/wechat-schedule-query.md).
-
-Phase 55/56 WeChat voice secretary mode: voice messages should reuse the Hermes
-gateway ASR/TTS pipeline. After Hermes transcribes speech to text, secretary
-requests such as `我明天什么安排`, `帮我把下午会议推迟半小时`, or `下周上海出差怎么样`
-must route into the existing Calendar / Trip / reminder scripts. Current sealed
-behavior is text-first: `voice_mode=off` is the default for the Weixin profile,
-and audio attachments are only expected when the user explicitly asks for a
-voice reply. `开车模式` / `安静模式` / `只文字回复` should not append audio
-attachments. Weixin iLink bot outbound native voice bubbles are known to be
-silently dropped by the client, so this version uses visible audio attachments
-when voice is explicitly requested; attachments use a Chinese file name such as
-`Hermes语音回复.ogg` and no `voice message as attachment` caption. Voice input
-does not bypass confirmation for create/update/delete. See
-[docs/wechat-voice-secretary.md](docs/wechat-voice-secretary.md).
-
-Phase 56 WeChat voice validation: the standard voice tests are `我明天什么安排`,
-`帮我把下午会议推迟半小时`, and `下周上海出差怎么样`. Expected logs include
-`voice`, `ASR`, `TTS`, `schedule_query_router.py`, `reminder_action_flow.py`,
-and `trip_flow.py`. The validation keeps the same safety boundary: voice input
-never skips confirmation, never writes Apple Reminders, and never modifies
-`飞行计划`. See [docs/wechat-voice-validation.md](docs/wechat-voice-validation.md).
-
-Delete flow bugfix: deletion requests such as `删除游泳计划` now go through
-`delete_event_flow.py draft` first, then `delete_event_flow.py confirm` after
-explicit confirmation. The confirm step deletes by `calendar + title + start +
-end` identity instead of a guessed raw title, so Hermes must not claim deletion
-unless the confirm command returns `ok=true`. See
-[docs/delete-event-flow.md](docs/delete-event-flow.md).
-
-## Calendar Policy
-
-Read calendars:
-
-- 商务计划
-- 家庭计划
-- 个人计划
-- 夫妻计划
-- 飞行计划
-
-Normal write calendars:
-
-- 商务计划
-- 家庭计划
-- 个人计划
-- 夫妻计划
-
-`飞行计划` is not writable through normal create/update/delete. The only flight
-write is the dedicated location enhancement on the original flight event, and it
-only updates the `location` field.
-
-## Directory Structure
+### 目录结构
 
 ```text
 hermes-apple-calendar-assistant/
 ├── AGENTS.md
 ├── README.md
 ├── SKILL.md
-├── .gitignore
-├── .codex/
-│   └── config.toml
 ├── config/
 │   └── settings.json
 ├── data/
-│   ├── state.json
-│   ├── pending_confirmations.json
-│   ├── flight_seen.json
-│   └── flight_pending.json
+│   └── .gitkeep
 ├── deploy/
 │   └── launchd/
-│       ├── com.adoramon.hermes-apple-calendar-flight-auto-enhancer.plist
-│       ├── com.adoramon.hermes-apple-calendar-reminder-worker.plist
-│       └── com.adoramon.hermes-apple-calendar-outbox-consumer.plist
 ├── docs/
-│   ├── reminder-worker.md
-│   ├── flight-auto-enhancer.md
-│   └── v2-roadmap.md
-└── scripts/
-    ├── calendar_ops.py
-    ├── interactive_create.py
-    ├── flight_parser.py
-    ├── flight_watcher.py
-    ├── flight_enhancer.py
-    ├── flight_auto_enhancer.py
-    ├── nlp_event_parser.py
-    ├── conflict_checker.py
-    ├── reminder_worker.py
-    ├── upcoming_reminders.py
-    ├── settings.py
-    └── util.py
+├── scripts/
+└── tests/
 ```
 
-## Local Usage
+### 常用命令
+
+列出日历：
+
+```bash
+python3 scripts/calendar_ops.py calendars
+```
+
+查询日程：
+
+```bash
+python3 scripts/calendar_ops.py events "<CALENDAR_NAME>" \
+  --start "2026-04-28T00:00:00" \
+  --end "2026-04-29T00:00:00"
+```
+
+创建待确认日程草稿：
+
+```bash
+python3 scripts/interactive_create.py create-draft \
+  --session-key "<SESSION_KEY>" \
+  --calendar "<CALENDAR_NAME>" \
+  --title "<EVENT_TITLE>" \
+  --start "2026-04-28T15:00:00" \
+  --end "2026-04-28T16:00:00" \
+  --location "<LOCATION>" \
+  --notes "<NOTES>"
+```
+
+确认或取消草稿：
+
+```bash
+python3 scripts/interactive_create.py confirm --session-key "<SESSION_KEY>"
+python3 scripts/interactive_create.py cancel --session-key "<SESSION_KEY>"
+```
+
+自然语言解析为日程草稿：
+
+```bash
+python3 scripts/nlp_event_parser.py parse "明天下午三点开会"
+```
+
+冲突检测：
+
+```bash
+python3 scripts/conflict_checker.py check \
+  --calendar "<CALENDAR_NAME>" \
+  --start "2026-04-28T15:00:00" \
+  --end "2026-04-28T16:00:00"
+```
+
+提醒扫描：
+
+```bash
+python3 scripts/reminder_worker.py scan
+python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
+```
+
+查看 outbox：
+
+```bash
+python3 scripts/outbox.py list --limit 20
+python3 scripts/hermes_outbox_cli.py pending --limit 10
+```
+
+查询自然语言日程：
+
+```bash
+python3 scripts/schedule_query_router.py query --text "我明天什么安排"
+```
+
+航班位置增强：
+
+```bash
+python3 scripts/flight_auto_enhancer.py run
+```
+
+Trip 草稿和摘要：
+
+```bash
+python3 scripts/trip_planner.py draft --text "下周去<CITY>出差，两天"
+python3 scripts/trip_briefing_worker.py scan --hours 48
+```
+
+### 微信语音策略
+
+当前封板策略是文字优先：
+
+- 默认只回文字。
+- 用户明确要求语音回复时，Hermes 可发送可见音频附件。
+- 静音、驾驶或只文字模式不追加音频附件。
+- 当前 Weixin iLink 出站原生 voice 气泡可能被客户端静默丢弃，因此可靠降级是音频附件。
+- 附件不应带英文 caption，文件名应使用通用中文名称。
+
+详见 [docs/wechat-voice-secretary.md](docs/wechat-voice-secretary.md) 和
+[docs/wechat-voice-validation.md](docs/wechat-voice-validation.md)。
+
+### 部署
+
+1. 确保 macOS 已允许终端或 Hermes 运行环境通过 AppleScript 访问 Calendar.app。
+2. 在 Hermes profile 中安装或引用本仓库的 `SKILL.md`。
+3. 按需安装 `deploy/launchd/` 下的 launchd 模板。
+4. launchd 模板中的路径应按本机仓库位置调整。
+5. 不要把 profile token、真实 chat id 或账号文件复制到本仓库。
+
+### 验证
+
+```bash
+python3 -m py_compile scripts/*.py
+python3 scripts/schedule_query_router.py query --text "我明天什么安排"
+python3 scripts/flight_auto_enhancer.py run
+python3 -m unittest discover tests
+```
+
+如果需要检查运行时 JSON，可在本机执行：
+
+```bash
+python3 -m json.tool data/pending_confirmations.json
+```
+
+注意：`data/` 文件只用于本机运行，不应提交。
+
+### 隐私说明
+
+- `data/*.json`、`data/*.jsonl` 已从 Git 历史清理，并被 `.gitignore` 忽略。
+- 新增样例请使用 `<EVENT_TITLE>`、`<LOCATION>`、`<CALENDAR_NAME>`、
+  `<CITY>` 等占位符。
+- 不要在 README 或公开文档中写入真实姓名、日历名称、地点、订单号、航班号、
+  chat id、token 或 profile 私有路径。
+
+## English
+
+Hermes Apple Calendar Assistant is a macOS-only Hermes custom skill for
+Calendar.app. It turns Hermes inputs, including chat and voice-transcribed text,
+into safe calendar queries, confirmation-required drafts, reminders, and trip
+summaries.
+
+This repository stores source code, documentation, and configuration templates
+only. Runtime files under `data/` are ignored by Git so real events, locations,
+flight details, messages, and pending drafts are not committed to GitHub.
+
+### Status
+
+- Release line: `v2.0-rc wechat voice attachment sealed`
+- Platform: macOS only
+- Python: 3.11+
+- Calendar access: AppleScript / `osascript`
+- Hermes profile: configured locally; this README does not include profile
+  names, tokens, or private account data
+
+### Features
+
+- Query Apple Calendar events when a time range is known.
+- Parse natural-language event requests into drafts.
+- Require explicit confirmation before create, update, or delete operations.
+- Require a second confirmation for deletion.
+- Delete by exact `calendar + title + start + end` identity.
+- Detect event conflicts and suggest alternative slots.
+- Scan reminder candidates and write local outbox messages.
+- Aggregate travel orders into Trip drafts.
+- Create local Trip planning drafts from one-sentence travel intent.
+- Generate pre-trip briefing messages.
+- Route WeChat voice input through the existing Hermes ASR pipeline before
+  calendar, Trip, or reminder handling.
+
+### Safety Boundaries
+
+- Do not read WeChat tokens.
+- Do not call WeChat APIs directly.
+- Do not request external flight, hotel, or pricing data.
+- Do not book tickets or hotels.
+- Do not write Apple Reminders.
+- Do not skip confirmation for Calendar writes.
+- Do not create flight events.
+- The protected flight calendar is read-only, except for the dedicated flight
+  location enhancer, which may update the original event `location` field.
+- Runtime `data/*.json` and `data/*.jsonl` files must not be committed.
+
+### Calendar Configuration
+
+Configure local calendar names in `config/settings.json`. This README uses
+generic placeholders:
+
+- `READ_CALENDARS`: calendars allowed for queries.
+- `WRITE_CALENDARS`: calendars allowed for normal create/update/delete.
+- `PROTECTED_FLIGHT_CALENDAR`: the read-only flight calendar synchronized by an
+  external flight source.
+
+Do not put real calendar names, customer names, locations, or order details in
+README files, issues, commit messages, or public documentation.
+
+### Project Layout
+
+```text
+hermes-apple-calendar-assistant/
+├── AGENTS.md
+├── README.md
+├── SKILL.md
+├── config/
+│   └── settings.json
+├── data/
+│   └── .gitkeep
+├── deploy/
+│   └── launchd/
+├── docs/
+├── scripts/
+└── tests/
+```
+
+### Common Commands
 
 List calendars:
 
@@ -364,402 +291,126 @@ List calendars:
 python3 scripts/calendar_ops.py calendars
 ```
 
-Query a calendar:
+Query events:
 
 ```bash
-python3 scripts/calendar_ops.py events "个人计划" --start "2026-04-16T00:00:00" --end "2026-04-17T00:00:00"
+python3 scripts/calendar_ops.py events "<CALENDAR_NAME>" \
+  --start "2026-04-28T00:00:00" \
+  --end "2026-04-29T00:00:00"
 ```
 
-Create a pending event draft:
+Create a confirmation-required draft:
 
 ```bash
 python3 scripts/interactive_create.py create-draft \
-  --session-key "wechat_user_001" \
-  --calendar "个人计划" \
-  --title "和客户开会" \
-  --start "2026-04-18T15:00:00" \
-  --end "2026-04-18T16:00:00" \
-  --location "国贸" \
-  --notes "讨论商务合作"
+  --session-key "<SESSION_KEY>" \
+  --calendar "<CALENDAR_NAME>" \
+  --title "<EVENT_TITLE>" \
+  --start "2026-04-28T15:00:00" \
+  --end "2026-04-28T16:00:00" \
+  --location "<LOCATION>" \
+  --notes "<NOTES>"
 ```
 
-Confirm or cancel:
+Confirm or cancel a draft:
 
 ```bash
-python3 scripts/interactive_create.py confirm --session-key "wechat_user_001"
-python3 scripts/interactive_create.py cancel --session-key "wechat_user_001"
+python3 scripts/interactive_create.py confirm --session-key "<SESSION_KEY>"
+python3 scripts/interactive_create.py cancel --session-key "<SESSION_KEY>"
 ```
 
-Parse a natural-language create request into a draft:
+Parse natural language into an event draft:
 
 ```bash
-python3 scripts/nlp_event_parser.py parse "明天下午三点和王总开会"
+python3 scripts/nlp_event_parser.py parse "meeting tomorrow at 3pm"
 ```
 
-Check conflicts for a proposed event window:
+Check conflicts:
 
 ```bash
-python3 scripts/conflict_checker.py check --calendar "商务计划" --start "2026-04-27T15:00:00" --end "2026-04-27T16:00:00"
+python3 scripts/conflict_checker.py check \
+  --calendar "<CALENDAR_NAME>" \
+  --start "2026-04-28T15:00:00" \
+  --end "2026-04-28T16:00:00"
 ```
 
-Scan reminder candidates:
+Scan reminders:
 
 ```bash
 python3 scripts/reminder_worker.py scan
-```
-
-Write outbound reminder messages into the local dry-run outbox:
-
-```bash
 python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
 ```
 
-Dry-run consume pending outbox messages:
+Inspect outbox messages:
 
 ```bash
-python3 scripts/outbox_consumer.py dry-run --limit 10
-```
-
-Draft a reminder follow-up action:
-
-```bash
-python3 scripts/reminder_action_flow.py draft --text "推迟30分钟"
-python3 scripts/reminder_action_flow.py draft --text "延后30分钟"
-python3 scripts/reminder_action_flow.py confirm --session-key "<session_key>"
-```
-
-Hermes WeChat reminder follow-up test replies:
-
-- `推迟30分钟`
-- `延后30分钟`
-- `取消这个日程`
-- `改到明天上午10点`
-
-Expected behavior: generate a draft first; do not modify Calendar during draft;
-delete and reschedule require explicit second confirmation. If draft succeeds,
-do not ask which event. Draft replies should say `已生成操作草稿，尚未修改日程。`;
-successful Calendar changes should say `已更新 Apple Calendar 日程。` Never mention
-Apple Reminders unless a future implementation explicitly writes to it.
-
-Hermes local outbox CLI:
-
-```bash
+python3 scripts/outbox.py list --limit 20
 python3 scripts/hermes_outbox_cli.py pending --limit 10
-python3 scripts/hermes_outbox_cli.py status --id "<record_id>"
-python3 scripts/hermes_outbox_cli.py mark-dry-run-sent --id "<record_id>"
 ```
 
-The Hermes CLI only reads pending messages, checks status, and marks pending
-records as `sent_dry_run`. It cannot delete records, modify message content, mark
-real `sent`, or send network requests.
-
-Outbox safety switches live in `config/settings.json`:
-
-```json
-{
-  "outbox": {
-    "send_mode": "dry_run",
-    "send_modes_supported": ["dry_run"],
-    "real_send_enabled": false,
-    "sender": "channel_sender",
-    "allowed_channels": ["hermes"],
-    "default_channel": "hermes",
-    "default_recipient": "default",
-    "max_messages_per_run": 10,
-    "hermes_channel": {
-      "enabled": false,
-      "transport": "local_cli",
-      "notes": "reserved for future real Hermes dispatch"
-    }
-  }
-}
-```
-
-Final real-send gate:
-
-```json
-{
-  "real_send_gate": {
-    "enabled": false,
-    "require_manual_config_change": true,
-    "require_confirm_phrase": "ENABLE_REAL_SEND",
-    "allowed_channels": [],
-    "audit_required": true
-  }
-}
-```
-
-`send_mode` must remain `dry_run` in the current beta line. Any other value
-returns `ok=false` because real sending is not implemented yet. The consumer also
-skips channels outside `allowed_channels`, and caps each run by
-`max_messages_per_run`. See [docs/channel-sender.md](docs/channel-sender.md) for
-the pre-real-send channel sender abstraction and reserved Hermes channel design.
-See [docs/real-send-gate.md](docs/real-send-gate.md) for the final real-send
-gate, and [docs/rollback.md](docs/rollback.md) for rollback steps.
-
-Scan flight events:
+Run a natural-language schedule query:
 
 ```bash
-python3 scripts/flight_watcher.py scan --days 30
-python3 scripts/flight_enhancer.py list-pending
-python3 scripts/flight_enhancer.py confirm "<task_id>"
+python3 scripts/schedule_query_router.py query --text "what is my schedule tomorrow"
 ```
 
-Run automatic flight enhancement once:
+Run flight location enhancement:
 
 ```bash
 python3 scripts/flight_auto_enhancer.py run
 ```
 
-## Deployment
-
-Deploy `SKILL.md` into the Hermes custom skill location used by
-`sunny-wechat-lite`. The skill file uses absolute script paths so Hermes does not
-need to run from the repository root.
-
-Calendar access depends on macOS automation permissions for `osascript` and
-Calendar.app.
-
-Flight auto enhancement can be installed as a user-level launchd task:
+Draft a Trip plan and scan briefings:
 
 ```bash
-mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
-mkdir -p ~/Library/LaunchAgents
-cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-flight-auto-enhancer.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-flight-auto-enhancer.plist
+python3 scripts/trip_planner.py draft --text "business trip to <CITY> next week for two days"
+python3 scripts/trip_briefing_worker.py scan --hours 48
 ```
 
-The launchd task runs every 5 minutes and calls:
+### WeChat Voice Policy
 
-```bash
-python3 scripts/flight_auto_enhancer.py run
-```
+The sealed behavior is text-first:
 
-See [docs/flight-auto-enhancer.md](docs/flight-auto-enhancer.md) for install,
-uninstall, log, and `flight_seen.json` reset instructions.
+- Text replies are the default.
+- Audio is sent only when the user explicitly asks for a voice reply.
+- Silent, driving, or text-only modes do not append audio.
+- Native outbound Weixin voice bubbles may be silently dropped by the iLink
+  client, so a visible audio attachment is the reliable fallback.
+- Audio attachments should use a generic Chinese filename and no English
+  caption.
 
-Flight auto enhancer 与 reminder worker 的区别：
+See [docs/wechat-voice-secretary.md](docs/wechat-voice-secretary.md) and
+[docs/wechat-voice-validation.md](docs/wechat-voice-validation.md).
 
-- `flight_auto_enhancer.py` 只服务 `飞行计划`，会在允许边界内写回原事件
-  `location` 字段，用于补充出发机场/航站楼。
-- `reminder_worker.py` 只读所有 `read_calendars`，生成提醒候选 JSON，并用
-  `data/reminder_seen.json` 做幂等；当前阶段不发送微信、Telegram 或系统通知。
+### Deployment
 
-Reminder scanning can also run as a launchd task:
+1. Grant Calendar.app automation permission to the terminal or Hermes runtime.
+2. Install or reference `SKILL.md` from the local Hermes profile.
+3. Install launchd templates from `deploy/launchd/` only when needed.
+4. Adjust launchd paths for the local repository path.
+5. Do not copy profile tokens, real chat ids, or account files into this repo.
 
-```bash
-mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
-mkdir -p ~/Library/LaunchAgents
-cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-reminder-worker.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
-```
-
-The reminder worker launchd task runs every 1 minute and calls:
-
-```bash
-python3 scripts/reminder_worker.py scan
-```
-
-For the v2.0-beta dry-run outbox chain, reminder worker can also be run by
-launchd with outbound outbox writing enabled:
-
-```bash
-python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
-```
-
-In this mode it only reads Calendar.app and writes
-`data/outbox_messages.jsonl`. It does not send WeChat, Telegram, or any external
-network message. Install/uninstall is the same reminder worker LaunchAgent flow:
-
-```bash
-mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
-mkdir -p ~/Library/LaunchAgents
-cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-reminder-worker.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
-launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-reminder-worker.plist
-```
-
-Logs:
-
-```bash
-tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.out.log
-tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/reminder_worker.err.log
-```
-
-Trip briefing can also run as a launchd task. It scans every 30 minutes and
-writes whole-trip briefing messages to the same outbox:
-
-```bash
-mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
-mkdir -p ~/Library/LaunchAgents
-cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-trip-briefing-worker.plist
-```
-
-The full Trip briefing reminder path is:
-
-```text
-Apple Calendar / data/trip_drafts.json
-  -> trip_briefing_worker.py scan --hours 48
-  -> data/outbox_messages.jsonl
-  -> Hermes Cron bridge
-  -> 微信
-```
-
-Logs:
-
-```bash
-tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/trip_briefing_worker.out.log
-tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/trip_briefing_worker.err.log
-```
-
-Hermes can inspect pending outbox messages with:
-
-```bash
-python3 scripts/hermes_outbox_cli.py pending --limit 10
-```
-
-See [docs/reminder-worker.md](docs/reminder-worker.md) for manual run,
-install, uninstall, log, and `reminder_seen.json` reset instructions.
-
-Outbox consumer dry-run can run as a separate launchd task:
-
-```bash
-mkdir -p /Users/administrator/Code/hermes-apple-calendar-assistant/logs
-mkdir -p ~/Library/LaunchAgents
-cp /Users/administrator/Code/hermes-apple-calendar-assistant/deploy/launchd/com.adoramon.hermes-apple-calendar-outbox-consumer.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
-```
-
-The outbox consumer launchd task runs every 1 minute and calls:
-
-```bash
-python3 scripts/outbox_consumer.py dry-run --limit 10
-```
-
-This launchd task only performs dry-run consumption: it reads pending records from
-`data/outbox_messages.jsonl` and marks them as `sent_dry_run`. It does not send
-WeChat, Telegram, Hermes push, or any external network message. `sent_dry_run`
-means “consumed by the local dry-run consumer”, not “actually delivered”.
-
-Uninstall:
-
-```bash
-launchctl unload ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
-rm ~/Library/LaunchAgents/com.adoramon.hermes-apple-calendar-outbox-consumer.plist
-```
-
-Logs:
-
-```bash
-tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.out.log
-tail -n 100 /Users/administrator/Code/hermes-apple-calendar-assistant/logs/outbox_consumer.err.log
-```
-
-Current dry-run reminder flow:
-
-```text
-Calendar.app
-  -> reminder_worker.py scan --format outbound --write-outbox
-  -> message_adapter.py
-  -> data/outbox_messages.jsonl
-  -> outbox_consumer.py dry-run --limit 10
-  -> channel_sender.py dry_run
-  -> hermes_dispatcher.py dry-run
-  -> status: sent_dry_run
-```
-
-This flow still does not send Telegram, WeChat, or external network requests.
-If `outbox_consumer` is enabled by launchd, it may consume pending outbox records
-quickly; in that case `hermes_outbox_cli.py pending --limit 10` can be empty even
-though reminders were scanned and marked `sent_dry_run`.
-The outbox consumer is guarded by `send_mode=dry_run`, channel allow-listing, and
-per-run message limits before any future real sender is added.
-See [docs/outbox-consumer.md](docs/outbox-consumer.md) for launchd install,
-uninstall, status, log, and manual trigger instructions.
-See [docs/hermes-outbox-cli.md](docs/hermes-outbox-cli.md) for the Hermes-facing
-local pending/status/mark interface. Hermes can also inspect pending outbox
-before consumer dry-run processing with:
-
-```bash
-python3 scripts/hermes_outbox_cli.py pending --limit 10
-```
-
-v2.0-beta 当前链路：
-
-```text
-Calendar.app
-  ↓
-reminder_worker
-  ↓
-message_adapter
-  ↓
-outbox_messages.jsonl
-  ↓
-outbox_consumer dry-run
-  ↓
-channel_sender
-  ↓
-hermes_dispatcher dry-run
-  ↓
-sent_dry_run
-```
-
-Hermes inspection path:
-
-```text
-outbox_messages.jsonl
-  ↓
-hermes_outbox_cli
-  ↓
-Hermes 展示 / 用户确认
-```
-
-## Verification
+### Verification
 
 ```bash
 python3 -m py_compile scripts/*.py
-python3 -m json.tool data/state.json
-python3 -m json.tool data/pending_confirmations.json
-python3 -m json.tool data/flight_seen.json
-python3 -m json.tool data/flight_pending.json
-python3 -m json.tool data/reminder_seen.json
-launchctl list | grep com.adoramon.hermes-apple-calendar
-tail -n 100 logs/reminder_worker.out.log
-tail -n 100 logs/outbox_consumer.out.log
-python3 scripts/reminder_worker.py scan --format outbound --channel hermes --recipient default --write-outbox
-python3 scripts/outbox.py list --limit 20
-tail -n 100 ~/.hermes/profiles/sunny-wechat-lite/logs/gateway.log
-tail -n 100 ~/.hermes/profiles/sunny-wechat-lite/logs/gateway.error.log
-python3 scripts/outbox_consumer.py dry-run --limit 10
+python3 scripts/schedule_query_router.py query --text "what is my schedule tomorrow"
 python3 scripts/flight_auto_enhancer.py run
-python3 -m unittest tests.test_flight_parser
+python3 -m unittest discover tests
 ```
 
-See [docs/v2-beta-acceptance.md](docs/v2-beta-acceptance.md) for the full
-dry-run acceptance checklist and rollback commands.
-See [docs/v2-rc-local-dispatch-acceptance.md](docs/v2-rc-local-dispatch-acceptance.md)
-for the local dispatch dry-run acceptance checklist.
-## Current Status
+To inspect runtime JSON locally:
 
-Stable from 1.0:
+```bash
+python3 -m json.tool data/pending_confirmations.json
+```
 
-- Calendar CRUD
-- Confirmation workflow
-- WeChat skill integration
-- Flight location enhancement
-- launchd automatic flight location enhancement
+Runtime files under `data/` are local-only and should not be committed.
 
-Added through v2.0-beta dry-run accepted:
+### Privacy Notes
 
-- Natural-language draft parsing
-- Conflict detection
-- Upcoming reminder candidate scanning
-- Reminder worker idempotency and launchd template
-- Local outbox queue, dry-run consumer, and Hermes local outbox CLI
-
-Still out of scope:
-
-- Contacts reminders
-- Birthday workflows
-- Travel Time
+- `data/*.json` and `data/*.jsonl` were removed from Git history and are ignored.
+- Use placeholders such as `<EVENT_TITLE>`, `<LOCATION>`, `<CALENDAR_NAME>`,
+  and `<CITY>` in examples.
+- Do not publish real names, calendar names, locations, order numbers, flight
+  numbers, chat ids, tokens, or private profile paths.
