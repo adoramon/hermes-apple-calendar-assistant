@@ -529,6 +529,41 @@ Apple Calendar
 - 安全边界：
   只读查询，不创建、不修改、不删除 Calendar，不请求外网，不读取微信 token。
 
+### Phase 55 WeChat Voice Secretary Mode
+
+- 新增文档：`docs/wechat-voice-secretary.md`。
+- 语音链路复用 Hermes gateway 原生 voice pipeline：
+  `微信语音 -> Hermes ASR -> 转写文本 -> Calendar / Trip / reminder 路由 -> 文字 + 可选 TTS`。
+- `SKILL.md` 新增语音秘书规则：
+  转写文本包含“安排、会议、日程、出门、出差、提醒、取消、推迟、增加”等关键词时，
+  优先进入 Apple Calendar Skill，不按普通闲聊处理。
+- `assistant_persona.py` 新增：
+  `format_voice_schedule_reply`、`format_voice_trip_reply`、
+  `format_voice_confirm_reply`，用于更短、更适合 TTS 的口语化秘书回复。
+- 新增 `voice_mode` 行为约定：
+  `off` 仅文字，`smart` 收到语音才语音回复，`always` 秘书类回复都带语音。
+- 安全边界：
+  不读取微信 token，不绕过 Hermes gateway，不重写 ASR/TTS，不请求外网；
+  语音输入不降低确认要求，创建、修改、删除、Trip 写入仍必须先草稿再确认。
+
+### Phase 56 WeChat Voice Validation
+
+- 新增文档：`docs/wechat-voice-validation.md`。
+- 固化微信端语音实测流程：
+  `我明天什么安排` -> `schedule_query_router.py query`；
+  `帮我把下午会议推迟半小时` -> `reminder_action_flow.py` 或修改草稿；
+  `下周上海出差怎么样` -> `schedule_query_router.py` 或 `trip_flow.py`。
+- 固化 `voice_mode` 验收：
+  `off` 仅文字，`smart` 收到语音才语音回复，`always` 秘书类回复总是语音。
+- 记录日志关键字：
+  `voice`、`ASR`、`TTS`、`schedule_query_router.py`、
+  `reminder_action_flow.py`、`trip_flow.py`。
+- 记录失败排查：
+  ASR 未转写、未进入 Calendar Skill、无 TTS 回复、修改/删除直接执行。
+- 安全边界：
+  不改 scripts/config/data/launchd；不读取微信 token；不绕过 Hermes gateway；
+  不跳过确认；不写 Apple Reminders；不修改 `飞行计划`。
+
 ### Delete Event Flow False-positive Fix
 
 - 新增 `scripts/delete_event_flow.py`：

@@ -132,6 +132,15 @@ Current version: `v2.0-rc local dispatch dry-run`
   新增 `schedule_query_router.py` 和 `docs/wechat-schedule-query.md`，支持“今天/明天
   什么安排”“下周上海出差怎么样”“这个月还有哪些出差”等自然语言查询；
   只读调用 Calendar 和 Trip 查询能力，输出秘书式摘要
+- Phase 55 微信语音秘书模式：
+  新增 `docs/wechat-voice-secretary.md`，记录微信语音 -> Hermes ASR 转写 ->
+  Calendar / Trip / reminder 路由 -> 文字 + 可选 TTS 回复的标准链路；
+  复用 Hermes 原生 voice pipeline，不读取微信 token、不改现有 profile 配置；
+  新增 `voice_mode=off|smart|always` 行为约定和 persona 语音回复文案函数
+- Phase 56 微信语音秘书实测收口：
+  新增 `docs/wechat-voice-validation.md`，固化语音测试流程、`voice` / `ASR` /
+  `TTS` / `schedule_query_router.py` / `reminder_action_flow.py` / `trip_flow.py`
+  日志关键字、`voice_mode` 验收、失败排查和安全边界
 - 删除日程误报修复：
   新增 `delete_event_flow.py` 和 `docs/delete-event-flow.md`，删除请求先查询候选并生成
   二次确认草稿，确认后按 `calendar + title + start + end` 精确身份删除，避免

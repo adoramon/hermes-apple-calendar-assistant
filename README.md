@@ -266,6 +266,22 @@ Calendar and Trip readers, then returns a secretary-style summary. This path is
 read-only and never creates, updates, or deletes Calendar events. See
 [docs/wechat-schedule-query.md](docs/wechat-schedule-query.md).
 
+Phase 55 WeChat voice secretary mode: voice messages should reuse the Hermes
+gateway ASR/TTS pipeline. After Hermes transcribes speech to text, secretary
+requests such as `我明天什么安排`, `帮我把下午会议推迟半小时`, or `下周上海出差怎么样`
+must route into the existing Calendar / Trip / reminder scripts. The default
+`voice_mode=smart` means voice requests may receive both text and TTS replies;
+`off` is text-only, and `always` is suitable for driving mode. Voice input does
+not bypass confirmation for create/update/delete. See
+[docs/wechat-voice-secretary.md](docs/wechat-voice-secretary.md).
+
+Phase 56 WeChat voice validation: the standard voice tests are `我明天什么安排`,
+`帮我把下午会议推迟半小时`, and `下周上海出差怎么样`. Expected logs include
+`voice`, `ASR`, `TTS`, `schedule_query_router.py`, `reminder_action_flow.py`,
+and `trip_flow.py`. The validation keeps the same safety boundary: voice input
+never skips confirmation, never writes Apple Reminders, and never modifies
+`飞行计划`. See [docs/wechat-voice-validation.md](docs/wechat-voice-validation.md).
+
 Delete flow bugfix: deletion requests such as `删除游泳计划` now go through
 `delete_event_flow.py draft` first, then `delete_event_flow.py confirm` after
 explicit confirmation. The confirm step deletes by `calendar + title + start +

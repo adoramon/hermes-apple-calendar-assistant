@@ -22,6 +22,13 @@ Reminders，否则不得回复“已同步至 Apple Reminders”。
 
 - 如果脚本返回 `data.display_message`，Hermes 应直接采用或只做轻微整理，不要改变事实。
 - 任何创建、修改、删除成功回复，只能基于脚本 `ok=true` 后发送。
+- 当用户发送包含明确日期、时间、地点、会议/培训/活动内容的通知文本时，即使没有说
+  “帮我创建”，也应视为潜在创建日程请求，必须立即进入 Create Rules。不得先只回复
+  “我稍后处理”“两分钟内给您回复”“我这就调用解析器”等未来时承诺。
+- 如果准备创建日程，当前回复必须已经完成至少一次本地脚本调用：
+  `nlp_event_parser.py parse`，或在字段完整时继续调用
+  `interactive_create.py create-draft`。没有脚本结果时，只能说明“我还没有真正创建草稿”，
+  不得暗示正在后台执行。
 - 不要自己编造 Apple Reminders 同步结果。
 - 不得因为日历、酒店订单、提醒或航班上下文自主创建、更新或替换任何 Hermes Skill。
 - 如果系统或自动复盘提示保存/创建日历相关 Skill，除非高先生在当前对话明确要求，否则必须回复 `Nothing to save.`。
@@ -73,6 +80,78 @@ Use this skill when the user says things like:
 - 删除日程
 - 扫描飞行计划
 - 检查航班位置
+
+## WeChat Voice Secretary Rules
+
+Hermes gateway 已负责微信语音消息的 ASR/TTS pipeline。本 Skill 不自行读取微信
+token、不直连微信、不实现新的语音转写或发送逻辑，只处理 Hermes 转写后的文字。
+
+当收到微信语音消息，或 Hermes 已将语音转为文字后，如果文本包含以下秘书事务线索，
+必须优先进入 Apple Calendar Skill，不要当普通闲聊处理：
+
+- `安排` / `会议` / `日程` / `出门` / `出差`
+- `提醒` / `取消` / `推迟` / `增加` / `添加`
+- `今天几点` / `明天什么安排` / `下周上海出差怎么样`
+
+路由规则：
+
+1. 查询类语音：优先调用 `schedule_query_router.py query --text "<转写文本>"`。
+2. 出差/Trip 类语音：优先调用 `schedule_query_router.py` 或既有 `trip_flow.py` /
+   `trip_briefing_worker.py` 只读摘要能力。
+3. 修改、删除、推迟类语音：仍必须走 `reminder_action_flow.py draft`、
+   `delete_event_flow.py draft` 或对应确认式草稿流程。
+4. 新增日程类语音：仍必须走 `nlp_event_parser.py parse` ->
+   `interactive_create.py create-draft`，等待用户确认后才 `confirm`。
+5. 语音输入不得降低安全等级：删除、修改、创建、Trip 写入仍必须确认。
+
+voice_mode 由 Hermes profile/gateway 层管理，本仓库只记录行为约定：
+
+- `off`：仅文字回复。
+- `smart`：默认模式，收到语音请求时可附带女声 TTS，文字请求只回文字。
+- `always`：秘书类回复都可附带女声 TTS。
+
+用户说“以后只文字回复”或“安静模式”时，应切换/建议切换 `voice_mode=off`。
+用户说“打开语音回复”时，应切换/建议切换 `voice_mode=smart`。
+用户说“开车模式”时，应切换/建议切换 `voice_mode=always`，但危险操作仍要确认。
+
+语音回复文案应简短、口语化、专业亲近。可使用：
+
+- `assistant_persona.format_voice_schedule_reply()`
+- `assistant_persona.format_voice_trip_reply()`
+- `assistant_persona.format_voice_confirm_reply()`
+
+### WeChat Voice Validation
+
+微信端语音秘书实测流程：
+
+1. 用户语音：`我明天什么安排`
+   - Hermes 应完成 ASR 转文字。
+   - 应调用 `schedule_query_router.py query --text "我明天什么安排"`。
+   - 返回文字回复，并按 `voice_mode` 决定是否附带 TTS。
+2. 用户语音：`帮我把下午会议推迟半小时`
+   - 应进入 `reminder_action_flow.py draft` 或日程修改草稿流程。
+   - 只生成草稿，不直接修改 Calendar。
+   - 等待用户确认。
+3. 用户语音：`下周上海出差怎么样`
+   - 应调用 `schedule_query_router.py` 或 `trip_flow.py`。
+   - 返回 Trip 摘要。
+
+预期日志关键字：
+
+- `voice`
+- `ASR`
+- `TTS`
+- `schedule_query_router.py`
+- `reminder_action_flow.py`
+- `trip_flow.py`
+
+失败排查：
+
+- 语音没有转文字：检查 Hermes gateway voice pipeline、ASR 模型配置和 `gateway.log`。
+- 没进入 Calendar Skill：检查本规则是否加载，检查 `gateway.log` 是否出现
+  `schedule_query_router.py` 调用。
+- 没有语音回复：检查 `voice_mode`、TTS 配置和 `gateway.log` 中的 TTS 日志。
+- 修改/删除直接执行：严重错误，必须修正本 `SKILL.md`；所有修改/删除仍需确认。
 
 ## Calendar Policy
 
@@ -135,6 +214,15 @@ you cannot access the calendar unless the script actually fails.
 ## Create Rules
 
 用户要求创建日程时，必须按以下顺序处理：
+
+会议通知、培训通知、活动通知的正文如果包含明确日期和时间，也按创建日程处理。典型线索：
+
+- `于2026年4月28日 14:00 - 17:00`
+- `在东方国信大厦二层培训教室`
+- `会议` / `培训` / `活动` / `参会` / `准时出席`
+
+禁止只回复“我先调用解析器”“稍等我写入”“两分钟内给您确切回复”。Hermes 当前轮必须
+实际调用脚本，并把脚本返回的草稿或错误返回给用户。
 
 1. 先调用自然语言解析器：
 
